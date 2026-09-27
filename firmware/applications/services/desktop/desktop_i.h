@@ -160,6 +160,7 @@ struct Desktop {
     size_t r0n1n_entry_count;
     R0n1nIconSlot r0n1n_icons[R0N1N_ENTRIES_MAX];
     size_t r0n1n_icon_count;
+    uint32_t capture_index_token; // storage change counter the index was built at; 0 = stale
     char search_query[R0N1N_QUERY_SIZE];
     const char* info_text; // shown by DesktopSceneInfo
     uint8_t section; // section opened from the carousel or the menu
@@ -224,6 +225,15 @@ size_t desktop_r0n1n_scan_apps(
 /** Entries for `section`: its built-in apps (with 14 px `tile icons` or 10 px
  * list icons), then the apps in its SD folders under their manifest names
  * and icons, alphabetically. */
+typedef enum {
+    R0n1nFeedbackClick, // a tap: selecting/opening something
+    R0n1nFeedbackSuccess, // a card read, a save
+    R0n1nFeedbackError, // nothing found, an app is missing
+} R0n1nFeedback;
+
+/** Short click/vibro + optional success/error cue, if feedback is enabled. */
+void desktop_r0n1n_feedback(Desktop* desktop, R0n1nFeedback kind);
+
 void desktop_r0n1n_section_entries(Desktop* desktop, R0n1nSection section, bool tile_icons);
 
 /** How many apps `section` holds: built-in plus SD (a directory scan only). */

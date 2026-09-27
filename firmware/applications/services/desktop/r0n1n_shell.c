@@ -12,6 +12,8 @@
 #include <storage/storage.h>
 #include <storage/storage_mtime.h>
 #include <loader/loader_menu.h>
+#include <notification/notification_messages.h>
+#include <notification/notification_messages_notes.h>
 #include <toolbox/path.h>
 
 #define TAG "R0n1nShell"
@@ -157,44 +159,129 @@ void desktop_r0n1n_entries_add(
     desktop->r0n1n_entry_count++;
 }
 
-void desktop_r0n1n_scan_captures(Desktop* desktop, const char* filter) {
+#define R0N1N_INDEX_DIR  EXT_PATH(".r0n1n")
+#define R0N1N_INDEX_PATH R0N1N_INDEX_DIR "/captures.idx"
+
+// One capture as an index line: "<type>\t<timestamp>\t<label>\t<path>".
+// Reading the index avoids re-walking every capture directory and stat-ing
+// every file on each search.
+static void desktop_r0n1n_capture_write_line(
+    File* out,
+    size_t type,
+    uint32_t timestamp,
+    const char* label,
+    const char* path) {
+    FuriString* line =
+        furi_string_alloc_printf("%u\t%lu\t%s\t%s\n", (unsigned)type, timestamp, label, path);
+    storage_file_write(out, furi_string_get_cstr(line), furi_string_size(line));
+    furi_string_free(line);
+}
+
+// Walk the capture directories and (re)write the index; returns success.
+static bool desktop_r0n1n_capture_reindex(Desktop* desktop) {
+    storage_common_mkdir(desktop->storage, R0N1N_INDEX_DIR);
+    File* out = storage_file_alloc(desktop->storage);
+    if(!storage_file_open(out, R0N1N_INDEX_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_free(out);
+        return false;
+    }
     File* dir = storage_file_alloc(desktop->storage);
     FuriString* path = furi_string_alloc();
-    FuriString* label = furi_string_alloc();
     char name[64];
     FileInfo info;
-
     for(size_t t = 0; t < COUNT_OF(r0n1n_capture_types); t++) {
         const R0n1nCaptureType* type = &r0n1n_capture_types[t];
         if(!storage_dir_open(dir, type->dir)) {
             storage_dir_close(dir);
             continue;
         }
+        const size_t ext_len = strlen(type->extension);
         while(storage_dir_read(dir, &info, name, sizeof(name))) {
             if(file_info_is_dir(&info) || name[0] == '.') continue;
             const size_t len = strlen(name);
-            const size_t ext_len = strlen(type->extension);
             if(len <= ext_len || strcmp(name + len - ext_len, type->extension) != 0) continue;
-            if(!desktop_r0n1n_matches(name, filter)) continue;
-
             furi_string_printf(path, "%s/%s", type->dir, name);
             uint32_t timestamp = 0;
             storage_common_mtime(desktop->storage, furi_string_get_cstr(path), &timestamp);
-            furi_string_set_strn(label, name, len - ext_len);
-            desktop_r0n1n_entries_add(
-                desktop,
-                type->app,
-                furi_string_get_cstr(path),
-                furi_string_get_cstr(label),
-                type->icon,
-                timestamp);
+            name[len - ext_len] = '\0'; // label without extension
+            desktop_r0n1n_capture_write_line(out, t, timestamp, name, furi_string_get_cstr(path));
         }
         storage_dir_close(dir);
     }
-
-    furi_string_free(label);
     furi_string_free(path);
     storage_file_free(dir);
+    storage_file_free(out);
+    return true;
+}
+
+// Rebuild the index only if the SD card changed since it was built. The
+// change counter is read AFTER building and kept in RAM, so the index's own
+// write doesn't invalidate it; any later write elsewhere (a saved or deleted
+// capture) does, and the next search rebuilds once.
+static void desktop_r0n1n_capture_ensure_index(Desktop* desktop) {
+    uint32_t token = 0;
+    storage_common_timestamp(desktop->storage, EXT_PATH(""), &token);
+    if(desktop->capture_index_token != 0 && desktop->capture_index_token == token &&
+       storage_file_exists(desktop->storage, R0N1N_INDEX_PATH)) {
+        return;
+    }
+    if(desktop_r0n1n_capture_reindex(desktop)) {
+        storage_common_timestamp(desktop->storage, EXT_PATH(""), &desktop->capture_index_token);
+    }
+}
+
+void desktop_r0n1n_scan_captures(Desktop* desktop, const char* filter) {
+    desktop_r0n1n_capture_ensure_index(desktop);
+
+    File* in = storage_file_alloc(desktop->storage);
+    if(!storage_file_open(in, R0N1N_INDEX_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        storage_file_free(in);
+        return;
+    }
+
+    FuriString* line = furi_string_alloc();
+    char buf[256];
+    size_t got;
+    furi_string_reset(line);
+    do {
+        got = storage_file_read(in, buf, sizeof(buf));
+        for(size_t i = 0; i <= got; i++) {
+            const bool end = (i == got);
+            if(!end && buf[i] != '\n') {
+                furi_string_push_back(line, buf[i]);
+                continue;
+            }
+            if(end) break; // continue accumulating from the next chunk
+            if(furi_string_size(line)) {
+                // type \t timestamp \t label \t path
+                const char* s = furi_string_get_cstr(line);
+                const char* p1 = strchr(s, '\t');
+                const char* p2 = p1 ? strchr(p1 + 1, '\t') : NULL;
+                const char* p3 = p2 ? strchr(p2 + 1, '\t') : NULL;
+                if(p1 && p2 && p3) {
+                    const size_t type = (size_t)strtoul(s, NULL, 10);
+                    const uint32_t timestamp = (uint32_t)strtoul(p1 + 1, NULL, 10);
+                    FuriString* label = furi_string_alloc();
+                    furi_string_set_strn(label, p2 + 1, (size_t)(p3 - (p2 + 1)));
+                    if(type < COUNT_OF(r0n1n_capture_types) &&
+                       desktop_r0n1n_matches(furi_string_get_cstr(label), filter)) {
+                        desktop_r0n1n_entries_add(
+                            desktop,
+                            r0n1n_capture_types[type].app,
+                            p3 + 1,
+                            furi_string_get_cstr(label),
+                            r0n1n_capture_types[type].icon,
+                            timestamp);
+                    }
+                    furi_string_free(label);
+                }
+            }
+            furi_string_reset(line);
+        }
+    } while(got == sizeof(buf));
+
+    furi_string_free(line);
+    storage_file_free(in);
 }
 
 size_t desktop_r0n1n_scan_apps(
@@ -333,6 +420,7 @@ void desktop_r0n1n_prepare_carousel(Desktop* desktop) {
 }
 
 void desktop_r0n1n_show_info(Desktop* desktop, const char* text) {
+    desktop_r0n1n_feedback(desktop, R0n1nFeedbackError);
     desktop->info_text = text;
     scene_manager_next_scene(desktop->scene_manager, DesktopSceneInfo);
 }
@@ -465,4 +553,28 @@ void desktop_r0n1n_section_entries(Desktop* desktop, R0n1nSection section, bool 
             UINT32_MAX - i);
     }
     desktop_r0n1n_section_scan(desktop, section, desktop_r0n1n_add_sd_app, NULL);
+}
+
+// R0N1N feedback: a short click on select, plus success/error cues, all
+// gated by the feedback setting. Sound and vibro further honour the
+// Control Center toggles and stealth mode (the notification service does
+// that itself), so a silent Flipper stays silent.
+static const NotificationSequence r0n1n_seq_click = {
+    &message_vibro_on,
+    &message_note_g5,
+    &message_delay_25,
+    &message_sound_off,
+    &message_vibro_off,
+    NULL,
+};
+
+void desktop_r0n1n_feedback(Desktop* desktop, R0n1nFeedback kind) {
+    if(!desktop->r0n1n.feedback) return;
+    const NotificationSequence* seq = &r0n1n_seq_click;
+    if(kind == R0n1nFeedbackSuccess) {
+        seq = &sequence_success;
+    } else if(kind == R0n1nFeedbackError) {
+        seq = &sequence_error;
+    }
+    notification_message(desktop->notification, seq);
 }

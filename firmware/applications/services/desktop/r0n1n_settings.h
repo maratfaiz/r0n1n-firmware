@@ -24,6 +24,7 @@ typedef struct {
     uint8_t profile;
     char quick[R0N1N_QUICK_SLOTS][R0N1N_SLOT_NAME_SIZE];
     bool simple_mode; // big-icon Home and menu with the basic functions only
+    bool feedback; // click/vibro on OK and on success/error, default on
 } R0n1nSettings;
 
 void r0n1n_settings_load(R0n1nSettings* settings);

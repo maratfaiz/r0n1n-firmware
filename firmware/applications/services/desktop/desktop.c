@@ -11,6 +11,7 @@
 #include <assets_icons.h>
 
 #include "scenes/desktop_scene.h"
+#include "scenes/desktop_scene_r0n1n.h"
 #include "scenes/desktop_scene_locked.h"
 #include "helpers/r0n1n_boot.h"
 
@@ -206,6 +207,11 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         desktop_apply_settings(desktop);
 
     } else {
+        // R0N1N: a short click when something is selected in the shell
+        const uint32_t kind = event & R0N1N_EVT_KIND;
+        if(kind == R0N1N_EVT_OK || kind == R0N1N_EVT_HOLD) {
+            desktop_r0n1n_feedback(desktop, R0n1nFeedbackClick);
+        }
         return scene_manager_handle_custom_event(desktop->scene_manager, event);
     }
 

@@ -83,6 +83,19 @@ menu with one big item per screen (32 px icon, 10x20 font): TV remote
 intercom key (iButton), key fob (125 kHz RFID), Files, Academy, power off,
 and "Обычный вид", which leaves simple mode after a confirmation.
 
+## Feedback and search
+
+- **Feedback** (R0N1N Settings → "Отклик"): a short click (a beep plus a
+  brief vibro) when something is selected in the shell, an error buzz when a
+  popup reports a problem, success cues from the apps themselves. Sound and
+  vibro still obey the Control Center toggles and stealth mode. Off disables
+  the shell click; default on. `desktop_r0n1n_feedback()`.
+- **Search index**: captures are listed from `/ext/.r0n1n/captures.idx`
+  instead of walking every capture directory and stat-ing every file on each
+  search. The index is rebuilt only when the SD card's change counter differs
+  from the one recorded (in RAM) at the last build, so a saved or deleted
+  capture refreshes it and nothing else costs a rescan.
+
 ## Academy
 
 `applications/system/academy`, on the SD card in Tools and in the R0N1N

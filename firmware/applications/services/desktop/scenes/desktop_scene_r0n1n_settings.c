@@ -8,8 +8,9 @@
 // R0N1N Settings: the R0N1N profile, then the stock settings apps with
 // Russian labels. Each stock entry launches the unchanged settings app.
 
-#define R0N1N_SETTINGS_PROFILE 0xFFFF
-#define R0N1N_SETTINGS_SIMPLE  0xFFFE
+#define R0N1N_SETTINGS_PROFILE  0xFFFF
+#define R0N1N_SETTINGS_SIMPLE   0xFFFE
+#define R0N1N_SETTINGS_FEEDBACK 0xFFFD
 
 void desktop_scene_r0n1n_settings_on_enter(void* context) {
     Desktop* desktop = context;
@@ -19,6 +20,14 @@ void desktop_scene_r0n1n_settings_on_enter(void* context) {
     r0n1n_list_set_title(list, &I_R_Gear_9x7, "Настройки");
     r0n1n_list_add_item(
         list, &I_R_Star_9x7, "Простой режим", "выкл", NULL, NULL, R0N1N_SETTINGS_SIMPLE);
+    r0n1n_list_add_item(
+        list,
+        &I_R_Sound_9x8,
+        "Отклик (звук/вибро)",
+        desktop->r0n1n.feedback ? "вкл" : "выкл",
+        NULL,
+        NULL,
+        R0N1N_SETTINGS_FEEDBACK);
     r0n1n_list_add_item(
         list,
         &I_R_Profile_7x7,
@@ -51,7 +60,13 @@ bool desktop_scene_r0n1n_settings_on_event(void* context, SceneManagerEvent even
 
     const uint32_t item = event.event & R0N1N_EVT_VALUE;
     scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneR0n1nSettings, item);
-    if(item == R0N1N_SETTINGS_SIMPLE) {
+    if(item == R0N1N_SETTINGS_FEEDBACK) {
+        desktop->r0n1n.feedback = !desktop->r0n1n.feedback;
+        r0n1n_settings_save(&desktop->r0n1n);
+        desktop_r0n1n_feedback(desktop, R0n1nFeedbackClick); // hear the new state
+        scene_manager_previous_scene(desktop->scene_manager);
+        scene_manager_next_scene(desktop->scene_manager, DesktopSceneR0n1nSettings);
+    } else if(item == R0N1N_SETTINGS_SIMPLE) {
         // Simple mode: big Home and menu, basic functions only. Leaving it is
         // the last item of its own menu.
         desktop->r0n1n.simple_mode = true;
