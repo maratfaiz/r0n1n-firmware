@@ -23,6 +23,7 @@ typedef struct {
     DateTime datetime;
     char profile_name[32];
     uint8_t battery_pct;
+    const Icon* wallpaper; // Home picture, NULL for none
     bool has_datetime;
     bool simple_mode;
 } DesktopMainViewModel;
@@ -93,7 +94,8 @@ void desktop_main_update_dashboard(
     DesktopMainView* main_view,
     const DateTime* datetime,
     const char* profile_name,
-    uint8_t battery_pct) {
+    uint8_t battery_pct,
+    const Icon* wallpaper) {
     furi_assert(main_view);
     furi_assert(datetime);
     furi_assert(profile_name);
@@ -103,6 +105,7 @@ void desktop_main_update_dashboard(
         {
             model->datetime = *datetime;
             model->battery_pct = battery_pct;
+            model->wallpaper = wallpaper;
             model->has_datetime = true;
             strlcpy(model->profile_name, profile_name, sizeof(model->profile_name));
         },
@@ -156,7 +159,7 @@ static void desktop_main_draw_callback(Canvas* canvas, void* model) {
     }
 
     r0n1n_ui_battery(canvas, 127, 1, m->battery_pct);
-    canvas_draw_icon(canvas, 77, 17, &I_R_Mountains_51x46);
+    if(m->wallpaper) canvas_draw_icon(canvas, 77, 17, m->wallpaper);
 
     FuriString* str = furi_string_alloc();
     locale_format_time(str, &m->datetime, locale_get_time_format(), false);

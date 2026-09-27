@@ -58,6 +58,14 @@ typedef struct {
     R0n1nSection sections[R0n1nSectionCount];
 } R0n1nProfileInfo;
 
+typedef struct {
+    const char* name;
+    const Icon* icon; // 51x46 Home picture, NULL for "none"
+} R0n1nWallpaper;
+
+extern const R0n1nWallpaper r0n1n_wallpapers[];
+extern const size_t r0n1n_wallpapers_count;
+
 extern const R0n1nSectionInfo r0n1n_sections[R0n1nSectionCount];
 extern const R0n1nProfileInfo r0n1n_profiles[R0n1nProfileCount];
 extern const R0n1nApp r0n1n_system_apps[];

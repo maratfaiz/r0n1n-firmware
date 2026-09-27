@@ -83,6 +83,14 @@ menu with one big item per screen (32 px icon, 10x20 font): TV remote
 intercom key (iButton), key fob (125 kHz RFID), Files, Academy, power off,
 and "Обычный вид", which leaves simple mode after a confirmation.
 
+## Wallpaper
+
+The Home picture (top-right, 51×46) is chosen in R0N1N Settings → "Фон":
+Горы, Череп, Маска, Город, Радио, Волны, or Нет. Built-in 1-bit art in
+`assets/icons/R0N1N` (`r0n1n_wallpapers[]`); the choice is `wallpaper` in
+R0n1nSettings v4 (v1–v3 migrated). The clock, date and profile stay on the
+left so they remain readable over any picture.
+
 ## Feedback and search
 
 - **Feedback** (R0N1N Settings → "Отклик"): a short click (a beep plus a

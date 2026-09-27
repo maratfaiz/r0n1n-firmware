@@ -290,11 +290,14 @@ static void desktop_clock_timer_callback(void* context) {
 static void desktop_dashboard_update(Desktop* desktop) {
     DateTime datetime;
     furi_hal_rtc_get_datetime(&datetime);
+    const uint8_t wp =
+        desktop->r0n1n.wallpaper < r0n1n_wallpapers_count ? desktop->r0n1n.wallpaper : 0;
     desktop_main_update_dashboard(
         desktop->main_view,
         &datetime,
         r0n1n_profiles[desktop->r0n1n.profile].name,
-        furi_hal_power_get_pct());
+        furi_hal_power_get_pct(),
+        r0n1n_wallpapers[wp].icon);
 }
 
 static void desktop_dashboard_update_timer_callback(void* context) {

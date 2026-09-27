@@ -8,9 +8,10 @@
 // R0N1N Settings: the R0N1N profile, then the stock settings apps with
 // Russian labels. Each stock entry launches the unchanged settings app.
 
-#define R0N1N_SETTINGS_PROFILE  0xFFFF
-#define R0N1N_SETTINGS_SIMPLE   0xFFFE
-#define R0N1N_SETTINGS_FEEDBACK 0xFFFD
+#define R0N1N_SETTINGS_PROFILE   0xFFFF
+#define R0N1N_SETTINGS_SIMPLE    0xFFFE
+#define R0N1N_SETTINGS_FEEDBACK  0xFFFD
+#define R0N1N_SETTINGS_WALLPAPER 0xFFFC
 
 void desktop_scene_r0n1n_settings_on_enter(void* context) {
     Desktop* desktop = context;
@@ -28,6 +29,16 @@ void desktop_scene_r0n1n_settings_on_enter(void* context) {
         NULL,
         NULL,
         R0N1N_SETTINGS_FEEDBACK);
+    r0n1n_list_add_item(
+        list,
+        &I_R_Star_9x7,
+        "Фон",
+        r0n1n_wallpapers
+            [desktop->r0n1n.wallpaper < r0n1n_wallpapers_count ? desktop->r0n1n.wallpaper : 0]
+                .name,
+        NULL,
+        NULL,
+        R0N1N_SETTINGS_WALLPAPER);
     r0n1n_list_add_item(
         list,
         &I_R_Profile_7x7,
@@ -60,7 +71,16 @@ bool desktop_scene_r0n1n_settings_on_event(void* context, SceneManagerEvent even
 
     const uint32_t item = event.event & R0N1N_EVT_VALUE;
     scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneR0n1nSettings, item);
-    if(item == R0N1N_SETTINGS_FEEDBACK) {
+    if(item == R0N1N_SETTINGS_WALLPAPER) {
+        // Cycle to the next Home picture
+        desktop->r0n1n.wallpaper = (desktop->r0n1n.wallpaper + 1) % r0n1n_wallpapers_count;
+        r0n1n_settings_save(&desktop->r0n1n);
+        desktop_r0n1n_feedback(desktop, R0n1nFeedbackClick);
+        scene_manager_set_scene_state(
+            desktop->scene_manager, DesktopSceneR0n1nSettings, R0N1N_SETTINGS_WALLPAPER);
+        scene_manager_previous_scene(desktop->scene_manager);
+        scene_manager_next_scene(desktop->scene_manager, DesktopSceneR0n1nSettings);
+    } else if(item == R0N1N_SETTINGS_FEEDBACK) {
         desktop->r0n1n.feedback = !desktop->r0n1n.feedback;
         r0n1n_settings_save(&desktop->r0n1n);
         desktop_r0n1n_feedback(desktop, R0n1nFeedbackClick); // hear the new state

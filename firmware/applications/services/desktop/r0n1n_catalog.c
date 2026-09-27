@@ -168,6 +168,17 @@ const R0n1nProfileInfo r0n1n_profiles[R0n1nProfileCount] = {
           R0n1nSectionGames}},
 };
 
+const R0n1nWallpaper r0n1n_wallpapers[] = {
+    {"Горы", &I_R_Mountains_51x46},
+    {"Череп", &I_R_WallSkull_51x46},
+    {"Маска", &I_R_WallMask_51x46},
+    {"Город", &I_R_WallCity_51x46},
+    {"Радио", &I_R_WallRadio_51x46},
+    {"Волны", &I_R_WallWaves_51x46},
+    {"Нет", NULL},
+};
+const size_t r0n1n_wallpapers_count = COUNT_OF(r0n1n_wallpapers);
+
 const R0n1nApp* r0n1n_catalog_find(const char* name) {
     for(size_t s = 0; s < R0n1nSectionCount; s++) {
         for(size_t i = 0; i < r0n1n_sections[s].app_count; i++) {

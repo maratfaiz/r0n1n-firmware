@@ -9,7 +9,7 @@
 
 #define R0N1N_SETTINGS_PATH  INT_PATH(".r0n1n.settings")
 #define R0N1N_SETTINGS_MAGIC (0x52)
-#define R0N1N_SETTINGS_VER   (3)
+#define R0N1N_SETTINGS_VER   (4)
 
 static const char* const r0n1n_quick_defaults[R0N1N_QUICK_SLOTS] = {
     "NFC",
@@ -62,6 +62,30 @@ static bool r0n1n_settings_load_v2(R0n1nSettings* settings) {
     return loaded;
 }
 
+// Version 3 had no wallpaper; the rest is kept on upgrade
+typedef struct {
+    uint8_t profile;
+    char quick[R0N1N_QUICK_SLOTS][R0N1N_SLOT_NAME_SIZE];
+    bool simple_mode;
+    bool feedback;
+} R0n1nSettingsV3;
+
+static bool r0n1n_settings_load_v3(R0n1nSettings* settings) {
+    R0n1nSettingsV3* v3 = malloc(sizeof(R0n1nSettingsV3));
+    bool loaded = saved_struct_load(
+        R0N1N_SETTINGS_PATH, v3, sizeof(R0n1nSettingsV3), R0N1N_SETTINGS_MAGIC, 3);
+    if(loaded) {
+        memset(settings, 0, sizeof(R0n1nSettings));
+        settings->profile = v3->profile;
+        memcpy(settings->quick, v3->quick, sizeof(settings->quick));
+        settings->simple_mode = v3->simple_mode;
+        settings->feedback = v3->feedback;
+        settings->wallpaper = 0;
+    }
+    free(v3);
+    return loaded;
+}
+
 void r0n1n_settings_load(R0n1nSettings* settings) {
     furi_assert(settings);
     if(!saved_struct_load(
@@ -70,7 +94,8 @@ void r0n1n_settings_load(R0n1nSettings* settings) {
            sizeof(R0n1nSettings),
            R0N1N_SETTINGS_MAGIC,
            R0N1N_SETTINGS_VER) &&
-       !r0n1n_settings_load_v2(settings) && !r0n1n_settings_load_v1(settings)) {
+       !r0n1n_settings_load_v3(settings) && !r0n1n_settings_load_v2(settings) &&
+       !r0n1n_settings_load_v1(settings)) {
         FURI_LOG_I(TAG, "No settings, using defaults");
         memset(settings, 0, sizeof(R0n1nSettings));
         settings->profile = R0n1nProfileEveryday;

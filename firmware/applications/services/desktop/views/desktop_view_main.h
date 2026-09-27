@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gui/view.h>
+#include <gui/icon.h>
 #include <datetime/datetime.h>
 #include "desktop_events.h"
 
@@ -35,7 +36,8 @@ void desktop_main_update_dashboard(
     DesktopMainView* main_view,
     const DateTime* datetime,
     const char* profile_name,
-    uint8_t battery_pct);
+    uint8_t battery_pct,
+    const Icon* wallpaper);
 
 DesktopMainView* desktop_main_alloc(void);
 void desktop_main_free(DesktopMainView* main_view);
