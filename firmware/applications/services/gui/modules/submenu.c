@@ -3,6 +3,8 @@
 #include <gui/elements.h>
 #include <furi.h>
 #include <m-array.h>
+#include <assets_icons.h>
+#include <gui/icon.h>
 
 struct Submenu {
     View* view;
@@ -10,6 +12,7 @@ struct Submenu {
 
 typedef struct {
     FuriString* label;
+    const Icon* icon; // R0N1N: chosen from the label; NULL = no icon
     uint32_t index;
     union {
         SubmenuItemCallback callback;
@@ -21,6 +24,7 @@ typedef struct {
 
 static void SubmenuItem_init(SubmenuItem* item) {
     item->label = furi_string_alloc();
+    item->icon = NULL;
     item->index = 0;
     item->callback = NULL;
     item->callback_context = NULL;
@@ -28,6 +32,7 @@ static void SubmenuItem_init(SubmenuItem* item) {
 
 static void SubmenuItem_init_set(SubmenuItem* item, const SubmenuItem* src) {
     item->label = furi_string_alloc_set(src->label);
+    item->icon = src->icon;
     item->index = src->index;
     item->callback = src->callback;
     item->callback_context = src->callback_context;
@@ -35,6 +40,7 @@ static void SubmenuItem_init_set(SubmenuItem* item, const SubmenuItem* src) {
 
 static void SubmenuItem_set(SubmenuItem* item, const SubmenuItem* src) {
     furi_string_set(item->label, src->label);
+    item->icon = src->icon;
     item->index = src->index;
     item->callback = src->callback;
     item->callback_context = src->callback_context;
@@ -62,6 +68,35 @@ typedef struct {
 static void submenu_process_up(Submenu* submenu);
 static void submenu_process_down(Submenu* submenu);
 static void submenu_process_ok(Submenu* submenu, InputType input_type);
+
+// R0N1N: an icon guessed from a menu label, so actions like "Эмуляция",
+// "Чтение", "Сохранить" show a small picture beside the text. Matching is by
+// a Russian (or English) word appearing anywhere in the label, longest words
+// first so "Сохранить как" doesn't match a shorter unrelated rule.
+static const Icon* submenu_icon_for_label(const char* label) {
+    typedef struct {
+        const char* word;
+        const Icon* icon;
+    } Rule;
+    static const Rule rules[] = {
+        {"Эмул", &I_R_MiEmulate_9x9},    {"Отправ", &I_R_MiEmulate_9x9},
+        {"Считать", &I_R_MiRead_9x9},    {"Чтение", &I_R_MiRead_9x9},
+        {"Читать", &I_R_MiRead_9x9},     {"Прочитать", &I_R_MiRead_9x9},
+        {"Запис", &I_R_MiWrite_9x9},     {"Сохран", &I_R_MiSave_9x9},
+        {"Удалить", &I_R_MiDelete_9x9},  {"Стереть", &I_R_MiDelete_9x9},
+        {"Переимен", &I_R_MiRename_9x9}, {"Изменить", &I_R_MiRename_9x9},
+        {"Редакт", &I_R_MiRename_9x9},   {"Добав", &I_R_MiAdd_9x9},
+        {"Вручную", &I_R_MiAdd_9x9},     {"Инфо", &I_R_MiInfo_9x9},
+        {"Подроб", &I_R_MiInfo_9x9},     {"О карте", &I_R_MiInfo_9x9},
+        {"Настрой", &I_R_MiConfig_9x9},  {"Разблок", &I_R_MiUnlock_9x9},
+        {"Запуск", &I_R_MiPlay_9x9},     {"Играть", &I_R_MiPlay_9x9},
+        {"Открыть", &I_R_MiOpen_9x9},
+    };
+    for(size_t i = 0; i < COUNT_OF(rules); i++) {
+        if(strstr(label, rules[i].word)) return rules[i].icon;
+    }
+    return NULL;
+}
 
 static void submenu_view_draw_callback(Canvas* canvas, void* _model) {
     SubmenuModel* model = _model;
@@ -100,15 +135,20 @@ static void submenu_view_draw_callback(Canvas* canvas, void* _model) {
                 canvas_set_color(canvas, ColorBlack);
             }
 
+            const Icon* icon = SubmenuItemArray_cref(it)->icon;
+            const int32_t text_x = icon ? 17 : 6;
+            const int32_t base_y = y_offset + (item_position * item_height);
+            if(icon) {
+                canvas_draw_icon(
+                    canvas, 4, base_y + (item_height - icon_get_height(icon)) / 2, icon);
+            }
+
             FuriString* disp_str;
             disp_str = furi_string_alloc_set(SubmenuItemArray_cref(it)->label);
-            elements_string_fit_width(canvas, disp_str, item_width - (6 * 2));
+            elements_string_fit_width(canvas, disp_str, item_width - text_x - 6);
 
             canvas_draw_str(
-                canvas,
-                6,
-                y_offset + (item_position * item_height) + item_height - 4,
-                furi_string_get_cstr(disp_str));
+                canvas, text_x, base_y + item_height - 4, furi_string_get_cstr(disp_str));
 
             furi_string_free(disp_str);
         }
@@ -211,6 +251,7 @@ void submenu_add_item(
         {
             item = SubmenuItemArray_push_new(model->items);
             furi_string_set_str(item->label, label);
+            item->icon = submenu_icon_for_label(label);
             item->index = index;
             item->callback = callback;
             item->callback_context = callback_context;
@@ -235,6 +276,7 @@ void submenu_add_item_ex(
         {
             item = SubmenuItemArray_push_new(model->items);
             furi_string_set_str(item->label, label);
+            item->icon = submenu_icon_for_label(label);
             item->index = index;
             item->callback_ex = callback;
             item->callback_context = callback_context;

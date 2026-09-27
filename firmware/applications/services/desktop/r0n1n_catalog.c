@@ -22,12 +22,22 @@ static const R0n1nApp r0n1n_apps_usb[] = {
     {"Bad USB", "BadUSB", &I_badusb_10px, &A_BadUsb_14},
     {"U2F", "U2F", &I_u2f_10px, &A_U2F_14},
     {EXT_PATH("apps/USB/hid_usb.fap"), "Пульт USB", &I_badusb_10px, &A_BadUsb_14},
-    {EXT_PATH("apps/Bluetooth/hid_ble.fap"), "Пульт Bluetooth", &I_R_Bluetooth_7x9, &A_U2F_14},
+};
+
+static const R0n1nApp r0n1n_apps_bluetooth[] = {
+    {EXT_PATH("apps/Bluetooth/hid_ble.fap"),
+     "Пульт Bluetooth",
+     &I_R_Bluetooth_7x9,
+     &I_R_TileBt_14x14},
 };
 
 static const R0n1nApp r0n1n_apps_dev[] = {
     {"GPIO", "GPIO", &I_R_Chip_9x7, &A_GPIO_14},
+};
+
+static const R0n1nApp r0n1n_apps_tools[] = {
     {"JS Runner", "Скрипты JS", &I_js_script_10px, &A_Plugins_14},
+    {EXT_PATH("apps/Tools/academy.fap"), "Академия", &I_R_Cap_10x7, &I_R_TileTools_14x14},
 };
 
 const R0n1nApp r0n1n_system_apps[] = {
@@ -38,27 +48,73 @@ const R0n1nApp r0n1n_system_apps[] = {
 };
 const size_t r0n1n_system_apps_count = COUNT_OF(r0n1n_system_apps);
 
+static const char* const r0n1n_dirs_radio[] = {"Sub-GHz", NULL};
+static const char* const r0n1n_dirs_cards[] = {"NFC", "RFID", "iButton", NULL};
+static const char* const r0n1n_dirs_ir[] = {"Infrared", NULL};
+static const char* const r0n1n_dirs_usb[] = {"USB", NULL};
+static const char* const r0n1n_dirs_bluetooth[] = {"Bluetooth", NULL};
+static const char* const r0n1n_dirs_dev[] = {"GPIO", NULL};
+static const char* const r0n1n_dirs_tools[] = {"Tools", "Scripts", NULL};
+static const char* const r0n1n_dirs_games[] = {"Games", NULL};
+static const char* const r0n1n_dirs_media[] = {"Media", NULL};
+
+#define R0N1N_SECTION_APPS(apps) apps, COUNT_OF(apps)
+
 const R0n1nSectionInfo r0n1n_sections[R0n1nSectionCount] = {
     [R0n1nSectionRadio] =
-        {"Эфир", "Радио", &I_sub1_10px, &A_Sub1ghz_14, r0n1n_apps_radio, COUNT_OF(r0n1n_apps_radio)},
+        {"Эфир",
+         "Радио",
+         &I_sub1_10px,
+         &A_Sub1ghz_14,
+         R0N1N_SECTION_APPS(r0n1n_apps_radio),
+         r0n1n_dirs_radio},
     [R0n1nSectionCards] =
         {"NFC",
          "Карты: NFC / RFID",
          &I_Nfc_10px,
          &A_NFC_14,
-         r0n1n_apps_cards,
-         COUNT_OF(r0n1n_apps_cards)},
+         R0N1N_SECTION_APPS(r0n1n_apps_cards),
+         r0n1n_dirs_cards},
     [R0n1nSectionIr] =
-        {"ИК", "ИК-порт", &I_ir_10px, &A_Infrared_14, r0n1n_apps_ir, COUNT_OF(r0n1n_apps_ir)},
+        {"ИК",
+         "ИК-порт",
+         &I_ir_10px,
+         &A_Infrared_14,
+         R0N1N_SECTION_APPS(r0n1n_apps_ir),
+         r0n1n_dirs_ir},
     [R0n1nSectionUsb] =
-        {"USB", "USB / HID", &I_badusb_10px, &A_BadUsb_14, r0n1n_apps_usb, COUNT_OF(r0n1n_apps_usb)},
+        {"USB",
+         "USB",
+         &I_badusb_10px,
+         &A_BadUsb_14,
+         R0N1N_SECTION_APPS(r0n1n_apps_usb),
+         r0n1n_dirs_usb},
+    [R0n1nSectionBluetooth] =
+        {"BT",
+         "Bluetooth",
+         &I_R_Bluetooth_7x9,
+         &I_R_TileBt_14x14,
+         R0N1N_SECTION_APPS(r0n1n_apps_bluetooth),
+         r0n1n_dirs_bluetooth},
     [R0n1nSectionDev] =
-        {"Разр.",
-         "GPIO / разработка",
+        {"GPIO",
+         "GPIO и модули",
          &I_R_Chip_9x7,
          &A_GPIO_14,
-         r0n1n_apps_dev,
-         COUNT_OF(r0n1n_apps_dev)},
+         R0N1N_SECTION_APPS(r0n1n_apps_dev),
+         r0n1n_dirs_dev},
+    [R0n1nSectionTools] =
+        {"Инстр.",
+         "Инструменты",
+         &I_R_Gear_9x7,
+         &I_R_TileTools_14x14,
+         R0N1N_SECTION_APPS(r0n1n_apps_tools),
+         r0n1n_dirs_tools},
+    [R0n1nSectionGames] =
+        {"Игры", "Игры", &I_R_App_9x7, &I_R_TileGames_14x14, NULL, 0, r0n1n_dirs_games},
+    [R0n1nSectionMedia] =
+        {"Медиа", "Медиа", &I_R_Sound_9x8, &I_R_TileMedia_14x14, NULL, 0, r0n1n_dirs_media},
+    [R0n1nSectionOther] = {"Другое", "Другое", &I_dir_10px, &I_R_TileOther_14x14, NULL, 0, NULL},
 };
 
 const R0n1nProfileInfo r0n1n_profiles[R0n1nProfileCount] = {
@@ -66,54 +122,51 @@ const R0n1nProfileInfo r0n1n_profiles[R0n1nProfileCount] = {
         {"Обычный",
          "Повседневные задачи",
          &I_R_Brightness_9x9,
-         4,
-         {R0n1nSectionRadio, R0n1nSectionCards, R0n1nSectionIr, R0n1nSectionUsb}},
+         7,
+         {R0n1nSectionRadio,
+          R0n1nSectionCards,
+          R0n1nSectionIr,
+          R0n1nSectionUsb,
+          R0n1nSectionTools,
+          R0n1nSectionGames,
+          R0n1nSectionMedia}},
     [R0n1nProfilePentest] =
         {"Пентест",
          "Инструменты безопасности",
          &I_R_Pentest_9x7,
-         5,
-         {R0n1nSectionRadio, R0n1nSectionCards, R0n1nSectionUsb, R0n1nSectionIr, R0n1nSectionDev}},
+         7,
+         {R0n1nSectionRadio,
+          R0n1nSectionCards,
+          R0n1nSectionUsb,
+          R0n1nSectionIr,
+          R0n1nSectionBluetooth,
+          R0n1nSectionDev,
+          R0n1nSectionTools}},
     [R0n1nProfileDev] =
         {"Разраб.",
          "Разработка и отладка",
          &I_R_Chip_9x7,
-         4,
-         {R0n1nSectionDev, R0n1nSectionUsb, R0n1nSectionRadio, R0n1nSectionCards}},
+         6,
+         {R0n1nSectionDev,
+          R0n1nSectionTools,
+          R0n1nSectionUsb,
+          R0n1nSectionBluetooth,
+          R0n1nSectionRadio,
+          R0n1nSectionCards}},
     [R0n1nProfileCtf] =
         {"CTF",
          "Лаборатории и практики",
          &I_R_Flag_7x7,
-         5,
-         {R0n1nSectionCards, R0n1nSectionRadio, R0n1nSectionIr, R0n1nSectionUsb, R0n1nSectionDev}},
+         8,
+         {R0n1nSectionCards,
+          R0n1nSectionRadio,
+          R0n1nSectionIr,
+          R0n1nSectionUsb,
+          R0n1nSectionBluetooth,
+          R0n1nSectionDev,
+          R0n1nSectionTools,
+          R0n1nSectionGames}},
 };
-
-const R0n1nDevTool r0n1n_dev_tools[] = {
-    {&I_R_Chip_9x7, "GPIO: пины и питание", "GPIO", NULL},
-    {&I_R_Uart_9x10, "UART: мост USB-UART", "GPIO", NULL},
-    {&I_R_I2c_9x9,
-     "I2C: сканер шины",
-     "i2ctools.fap",
-     "I2C Tools нет на SD.\nУстановите из каталога\nFlipper Apps."},
-    {&I_R_Spi_9x7,
-     "SPI: флеш-память",
-     "spi_mem_manager.fap",
-     "SPI Mem Manager нет на SD.\nУстановите из каталога\nFlipper Apps."},
-    {&I_R_Swd_9x7,
-     "SWD: отладчик DAP Link",
-     "dap_link.fap",
-     "DAP Link нет на SD.\nУстановите из каталога\nFlipper Apps."},
-    {&I_R_Logic_10x5,
-     "Логический анализатор",
-     "logic_analyzer.fap",
-     "Анализатора нет на SD.\nУстановите из каталога\nFlipper Apps."},
-    {&I_R_Console_9x7,
-     "CLI: консоль по USB",
-     NULL,
-     "CLI работает по USB:\nqFlipper -> CLI или\nкомпьютерный терминал."},
-    {&I_js_script_10px, "Скрипты JS", "JS Runner", NULL},
-};
-const size_t r0n1n_dev_tools_count = COUNT_OF(r0n1n_dev_tools);
 
 const R0n1nApp* r0n1n_catalog_find(const char* name) {
     for(size_t s = 0; s < R0n1nSectionCount; s++) {

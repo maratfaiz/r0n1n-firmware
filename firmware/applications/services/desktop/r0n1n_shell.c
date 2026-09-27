@@ -11,6 +11,8 @@
 #include <furi_hal_rtc.h>
 #include <storage/storage.h>
 #include <storage/storage_mtime.h>
+#include <loader/loader_menu.h>
+#include <toolbox/path.h>
 
 #define TAG "R0n1nShell"
 
@@ -115,6 +117,7 @@ void desktop_r0n1n_entries_clear(Desktop* desktop) {
         furi_string_free(desktop->r0n1n_entries[i].label);
     }
     desktop->r0n1n_entry_count = 0;
+    desktop->r0n1n_icon_count = 0;
 }
 
 void desktop_r0n1n_entries_add(
@@ -332,4 +335,134 @@ void desktop_r0n1n_prepare_carousel(Desktop* desktop) {
 void desktop_r0n1n_show_info(Desktop* desktop, const char* text) {
     desktop->info_text = text;
     scene_manager_next_scene(desktop->scene_manager, DesktopSceneInfo);
+}
+
+// SD folder `dir` belongs to `section`: named by it, or (Other) by none
+static bool desktop_r0n1n_dir_in_section(const char* dir, R0n1nSection section) {
+    for(size_t s = 0; s < R0n1nSectionCount; s++) {
+        const char* const* dirs = r0n1n_sections[s].sd_dirs;
+        for(size_t i = 0; dirs && dirs[i]; i++) {
+            if(strcmp(dirs[i], dir) == 0) return s == section;
+        }
+    }
+    return section == R0n1nSectionOther;
+}
+
+// An SD app already listed as a built-in entry of some section
+static bool desktop_r0n1n_is_builtin_path(const char* path) {
+    for(size_t s = 0; s < R0n1nSectionCount; s++) {
+        for(size_t i = 0; i < r0n1n_sections[s].app_count; i++) {
+            if(strcmp(r0n1n_sections[s].apps[i].name, path) == 0) return true;
+        }
+    }
+    return false;
+}
+
+// Visit the .fap files of `section`'s SD folders; returns how many there are
+static size_t desktop_r0n1n_section_scan(
+    Desktop* desktop,
+    R0n1nSection section,
+    void (*visit)(Desktop* desktop, FuriString* path, void* context),
+    void* context) {
+    File* top = storage_file_alloc(desktop->storage);
+    File* dir = storage_file_alloc(desktop->storage);
+    FuriString* path = furi_string_alloc();
+    char cat[R0N1N_CATEGORY_SIZE * 2];
+    char name[64];
+    FileInfo info;
+    size_t count = 0;
+
+    if(storage_dir_open(top, R0N1N_APPS_DIR)) {
+        while(storage_dir_read(top, &info, cat, sizeof(cat))) {
+            if(!file_info_is_dir(&info) || cat[0] == '.') continue;
+            if(!desktop_r0n1n_dir_in_section(cat, section)) continue;
+            furi_string_printf(path, "%s/%s", R0N1N_APPS_DIR, cat);
+            if(!storage_dir_open(dir, furi_string_get_cstr(path))) {
+                storage_dir_close(dir);
+                continue;
+            }
+            while(storage_dir_read(dir, &info, name, sizeof(name))) {
+                const size_t len = strlen(name);
+                if(file_info_is_dir(&info) || len <= 4 || strcmp(name + len - 4, ".fap") != 0) {
+                    continue;
+                }
+                furi_string_printf(path, "%s/%s/%s", R0N1N_APPS_DIR, cat, name);
+                if(desktop_r0n1n_is_builtin_path(furi_string_get_cstr(path))) continue;
+                count++;
+                if(visit) visit(desktop, path, context);
+            }
+            storage_dir_close(dir);
+        }
+    }
+    storage_dir_close(top);
+
+    furi_string_free(path);
+    storage_file_free(dir);
+    storage_file_free(top);
+    return count;
+}
+
+size_t desktop_r0n1n_section_count(Desktop* desktop, R0n1nSection section) {
+    return r0n1n_sections[section].app_count +
+           desktop_r0n1n_section_scan(desktop, section, NULL, NULL);
+}
+
+static void desktop_r0n1n_add_sd_app(Desktop* desktop, FuriString* path, void* context) {
+    UNUSED(context);
+    FuriString* name = furi_string_alloc();
+    const Icon* icon = &I_R_App_9x7;
+
+    // The manifest has the app's real name and its 10x10 icon
+    uint8_t* icon_data = NULL;
+    R0n1nIconSlot* slot = NULL;
+    if(desktop->r0n1n_icon_count < R0N1N_ENTRIES_MAX) {
+        slot = &desktop->r0n1n_icons[desktop->r0n1n_icon_count];
+        memset(slot->data, 0, sizeof(slot->data));
+        icon_data = slot->data;
+    } else {
+        icon_data = malloc(FAP_MANIFEST_MAX_ICON_SIZE); // name only, icon dropped
+    }
+    const bool loaded =
+        flipper_application_load_name_and_icon(path, desktop->storage, &icon_data, name);
+    if(loaded && slot && (slot->data[0] || slot->data[1] || slot->data[2])) {
+        slot->frame = slot->data;
+        const Icon fap_icon = {
+            .width = 10, .height = 10, .frame_count = 1, .frame_rate = 0, .frames = &slot->frame};
+        memcpy(&slot->icon, &fap_icon, sizeof(Icon));
+        icon = &slot->icon;
+        desktop->r0n1n_icon_count++;
+    }
+    if(!slot) free(icon_data);
+    if(!loaded) {
+        // Fall back to the file name: "hid_usb.fap" -> "Hid usb"
+        path_extract_filename(path, name, true);
+        furi_string_replace_all(name, "_", " ");
+    }
+
+    // Alphabetical after the built-ins: entries sort by descending timestamp
+    const char* n = furi_string_get_cstr(name);
+    const uint32_t order =
+        (UINT32_MAX >> 1) - (((uint32_t)(uint8_t)tolower((unsigned char)n[0]) << 16) |
+                             ((uint32_t)(uint8_t)tolower((unsigned char)n[1]) << 8));
+    desktop_r0n1n_entries_add(
+        desktop, furi_string_get_cstr(path), NULL, loader_display_name(n), icon, order);
+    furi_string_free(name);
+}
+
+void desktop_r0n1n_section_entries(Desktop* desktop, R0n1nSection section, bool tile_icons) {
+    const R0n1nSectionInfo* info = &r0n1n_sections[section];
+    desktop_r0n1n_entries_clear(desktop);
+    for(size_t i = 0; i < info->app_count; i++) {
+        const R0n1nApp* app = &info->apps[i];
+        // .fap built-ins live on SD and may be missing
+        if(app->name[0] == '/' && !storage_file_exists(desktop->storage, app->name)) continue;
+        desktop_r0n1n_entries_add(
+            desktop,
+            app->name,
+            NULL,
+            app->label,
+            tile_icons ? app->tile_icon : app->icon,
+            UINT32_MAX - i);
+    }
+    desktop_r0n1n_section_scan(desktop, section, desktop_r0n1n_add_sd_app, NULL);
 }

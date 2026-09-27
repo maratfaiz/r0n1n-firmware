@@ -29,7 +29,12 @@ typedef enum {
     R0n1nSectionCards,
     R0n1nSectionIr,
     R0n1nSectionUsb,
+    R0n1nSectionBluetooth,
     R0n1nSectionDev,
+    R0n1nSectionTools,
+    R0n1nSectionGames,
+    R0n1nSectionMedia,
+    R0n1nSectionOther,
     R0n1nSectionCount,
 } R0n1nSection;
 
@@ -38,8 +43,11 @@ typedef struct {
     const char* title; // list header / menu row
     const Icon* icon;
     const Icon* tile_icon;
-    const R0n1nApp* apps;
+    const R0n1nApp* apps; // built into the firmware or shipped with it
     uint8_t app_count;
+    // Folders under /ext/apps whose apps also belong here (NULL-terminated);
+    // the Other section takes the folders no section names.
+    const char* const* sd_dirs;
 } R0n1nSectionInfo;
 
 typedef struct {
@@ -50,17 +58,8 @@ typedef struct {
     R0n1nSection sections[R0n1nSectionCount];
 } R0n1nProfileInfo;
 
-typedef struct {
-    const Icon* icon;
-    const char* caption;
-    const char* target; // Loader name, "<file>.fap" looked up under /ext/apps, or NULL
-    const char* hint; // shown when the target is NULL or not installed
-} R0n1nDevTool;
-
 extern const R0n1nSectionInfo r0n1n_sections[R0n1nSectionCount];
 extern const R0n1nProfileInfo r0n1n_profiles[R0n1nProfileCount];
-extern const R0n1nDevTool r0n1n_dev_tools[];
-extern const size_t r0n1n_dev_tools_count;
 extern const R0n1nApp r0n1n_system_apps[];
 extern const size_t r0n1n_system_apps_count;
 

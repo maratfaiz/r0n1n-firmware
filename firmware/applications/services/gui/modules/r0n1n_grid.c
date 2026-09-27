@@ -51,6 +51,7 @@ ARRAY_DEF(
 typedef struct {
     R0n1nGridItemArray_t items;
     FuriString* title;
+    FuriString* empty_text;
     const Icon* title_icon;
     uint8_t columns;
     uint8_t tile_width;
@@ -107,19 +108,38 @@ static void r0n1n_grid_draw_callback(Canvas* canvas, void* _model) {
             -1);
     }
 
+    if(!count && !model->has_slider && furi_string_size(model->empty_text)) {
+        canvas_set_font(canvas, FontSecondary);
+        r0n1n_ui_multiline_centered(canvas, 33, furi_string_get_cstr(model->empty_text));
+    }
+
+    // Rows scroll: as many as fit above the caption (or slider), the one
+    // with the selection kept in view
     const uint8_t cols = MAX(model->columns, 1);
     const int32_t x0 = (128 - (cols * model->tile_width + (cols - 1) * R0N1N_GRID_GAP)) / 2;
-    for(size_t i = 0; i < count; i++) {
+    const int32_t bottom = model->has_slider        ? R0N1N_GRID_SLIDER_Y :
+                           model->caption_in_header ? 64 :
+                                                      R0N1N_UI_CAPTION_SEP_Y;
+    const int32_t row_h = model->tile_height + R0N1N_GRID_GAP;
+    const size_t visible_rows = MAX((bottom - model->y + R0N1N_GRID_GAP) / row_h, 1);
+    const size_t rows = (count + cols - 1) / cols;
+    const size_t selected_row = on_slider ? 0 : model->position / cols;
+    const size_t first_row = selected_row >= visible_rows ? selected_row - visible_rows + 1 : 0;
+    for(size_t i = first_row * cols; i < count && i < (first_row + visible_rows) * cols; i++) {
         const R0n1nGridItem* item = R0n1nGridItemArray_cget(model->items, i);
         r0n1n_ui_tile(
             canvas,
             x0 + (i % cols) * (model->tile_width + R0N1N_GRID_GAP),
-            model->y + (i / cols) * (model->tile_height + R0N1N_GRID_GAP),
+            model->y + (int32_t)(i / cols - first_row) * row_h,
             model->tile_width,
             model->tile_height,
             item->icon,
             i == model->position,
             item->marked);
+    }
+    if(rows > visible_rows) {
+        r0n1n_ui_scrollbar(
+            canvas, model->y, visible_rows * row_h - R0N1N_GRID_GAP, selected_row, rows);
     }
 
     if(model->has_slider) {
@@ -219,6 +239,7 @@ R0n1nGrid* r0n1n_grid_alloc(void) {
         {
             R0n1nGridItemArray_init(model->items);
             model->title = furi_string_alloc();
+            model->empty_text = furi_string_alloc();
             model->slider_caption = furi_string_alloc();
             model->title_icon = NULL;
             model->columns = 3;
@@ -245,6 +266,7 @@ void r0n1n_grid_free(R0n1nGrid* grid) {
         {
             R0n1nGridItemArray_clear(model->items);
             furi_string_free(model->title);
+            furi_string_free(model->empty_text);
             furi_string_free(model->slider_caption);
         },
         false);
@@ -265,6 +287,7 @@ void r0n1n_grid_reset(R0n1nGrid* grid) {
         {
             R0n1nGridItemArray_reset(model->items);
             furi_string_reset(model->title);
+            furi_string_reset(model->empty_text);
             furi_string_reset(model->slider_caption);
             model->title_icon = NULL;
             model->caption_in_header = false;
@@ -397,4 +420,10 @@ void r0n1n_grid_set_selected_item(R0n1nGrid* grid, uint32_t index) {
             }
         },
         true);
+}
+
+void r0n1n_grid_set_empty_text(R0n1nGrid* grid, const char* text) {
+    furi_check(grid);
+    with_view_model(
+        grid->view, R0n1nGridModel * model, { furi_string_set(model->empty_text, text); }, true);
 }

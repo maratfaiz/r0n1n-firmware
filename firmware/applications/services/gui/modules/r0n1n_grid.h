@@ -59,6 +59,9 @@ void r0n1n_grid_set_callbacks(
 
 void r0n1n_grid_set_selected_item(R0n1nGrid* grid, uint32_t index);
 
+/** Text shown centered while the grid has no items ('\\n' splits lines). */
+void r0n1n_grid_set_empty_text(R0n1nGrid* grid, const char* text);
+
 #ifdef __cplusplus
 }
 #endif

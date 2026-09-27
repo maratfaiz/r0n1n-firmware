@@ -97,6 +97,70 @@ static bool sd_mount_card_internal(StorageData* storage, bool notify) {
     return result;
 }
 
+/* R0N1N: the rest of the firmware speaks UTF-8, FatFs speaks the OEM code
+ * page 866 (targets/f7/fatfs/ffconf.h), which covers Russian. Paths are
+ * converted on the way in and names on the way out; on the card itself FAT
+ * keeps long names in Unicode, so they read correctly on a computer too.
+ * Characters code page 866 doesn't have become '_'. */
+static char* storage_ext_path_to_oem(const char* utf8) {
+    const size_t size = strlen(utf8) + 1;
+    char* out = malloc(size);
+    size_t o = 0;
+    for(const uint8_t* s = (const uint8_t*)utf8; *s;) {
+        uint16_t code = *s;
+        size_t len = 1;
+        if((s[0] & 0xE0) == 0xC0 && (s[1] & 0xC0) == 0x80) {
+            code = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+            len = 2;
+        } else if((s[0] & 0xF0) == 0xE0 && (s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80) {
+            code = ((s[0] & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+            len = 3;
+        }
+        s += len;
+        uint8_t oem = '_';
+        if(code < 0x80) {
+            oem = (uint8_t)code;
+        } else if(code >= 0x410 && code <= 0x43F) {
+            oem = 0x80 + (code - 0x410); // А..п
+        } else if(code >= 0x440 && code <= 0x44F) {
+            oem = 0xE0 + (code - 0x440); // р..я
+        } else if(code == 0x401) {
+            oem = 0xF0; // Ё
+        } else if(code == 0x451) {
+            oem = 0xF1; // ё
+        }
+        out[o++] = (char)oem;
+    }
+    out[o] = 0;
+    return out;
+}
+
+static void storage_ext_name_to_utf8(const char* oem, char* out, size_t size) {
+    size_t o = 0;
+    for(const uint8_t* s = (const uint8_t*)oem; *s && o + 1 < size; s++) {
+        uint16_t code = *s;
+        if(code >= 0x80 && code <= 0xAF) {
+            code = 0x410 + (code - 0x80);
+        } else if(code >= 0xE0 && code <= 0xEF) {
+            code = 0x440 + (code - 0xE0);
+        } else if(code == 0xF0) {
+            code = 0x401;
+        } else if(code == 0xF1) {
+            code = 0x451;
+        } else if(code >= 0x80) {
+            code = '_';
+        }
+        if(code < 0x80) {
+            out[o++] = (char)code;
+        } else {
+            if(o + 2 >= size) break;
+            out[o++] = (char)(0xC0 | (code >> 6));
+            out[o++] = (char)(0x80 | (code & 0x3F));
+        }
+    }
+    if(size) out[o] = 0;
+}
+
 static bool sd_remove_recursive(const char* path) {
     SDDir* current_dir = malloc(sizeof(DIR));
     SDFileInfo* file_info = malloc(sizeof(FILINFO));
@@ -246,7 +310,9 @@ FS_Error sd_card_info(StorageData* storage, SDInfo* sd_info) {
     memset(sd_info, 0, sizeof(SDInfo));
 
     // get fs info
-    error = f_getlabel(sd_data->path, sd_info->label, NULL);
+    char oem_label[SD_LABEL_LENGTH];
+    error = f_getlabel(sd_data->path, oem_label, NULL);
+    if(error == FR_OK) storage_ext_name_to_utf8(oem_label, sd_info->label, SD_LABEL_LENGTH);
     if(error == FR_OK) {
 #ifndef FURI_RAM_EXEC
         error = f_getfree(sd_data->path, &free_clusters, &fs);
@@ -408,7 +474,9 @@ static bool storage_ext_file_open(
     SDFile* file_data = malloc(sizeof(SDFile));
     storage_set_storage_file_data(file, file_data, storage);
 
-    file->internal_error_id = f_open(file_data, path, _mode);
+    char* oem_path = storage_ext_path_to_oem(path);
+    file->internal_error_id = f_open(file_data, oem_path, _mode);
+    free(oem_path);
     file->error_id = storage_ext_parse_error(file->internal_error_id);
     return file->error_id == FSE_OK;
 }
@@ -535,7 +603,9 @@ static bool storage_ext_dir_open(void* ctx, File* file, const char* path) {
 
     SDDir* file_data = malloc(sizeof(SDDir));
     storage_set_storage_file_data(file, file_data, storage);
-    file->internal_error_id = f_opendir(file_data, path);
+    char* oem_path = storage_ext_path_to_oem(path);
+    file->internal_error_id = f_opendir(file_data, oem_path);
+    free(oem_path);
     file->error_id = storage_ext_parse_error(file->internal_error_id);
     return file->error_id == FSE_OK;
 }
@@ -571,7 +641,7 @@ static bool storage_ext_dir_read(
     }
 
     if(name != NULL) {
-        snprintf(name, name_length, "%s", _fileinfo.fname);
+        storage_ext_name_to_utf8(_fileinfo.fname, name, name_length);
     }
 
     if(_fileinfo.fname[0] == 0) {
@@ -594,7 +664,9 @@ static bool storage_ext_dir_rewind(void* ctx, File* file) {
 static FS_Error storage_ext_common_stat(void* ctx, const char* path, FileInfo* fileinfo) {
     UNUSED(ctx);
     SDFileInfo _fileinfo;
-    SDError result = f_stat(path, &_fileinfo);
+    char* oem_path = storage_ext_path_to_oem(path);
+    SDError result = f_stat(oem_path, &_fileinfo);
+    free(oem_path);
 
     if(fileinfo != NULL) {
         fileinfo->size = _fileinfo.fsize;
@@ -609,7 +681,9 @@ static FS_Error storage_ext_common_stat(void* ctx, const char* path, FileInfo* f
 static FS_Error storage_ext_common_mtime(void* ctx, const char* path, uint32_t* timestamp) {
     UNUSED(ctx);
     SDFileInfo _fileinfo;
-    SDError result = f_stat(path, &_fileinfo);
+    char* oem_path = storage_ext_path_to_oem(path);
+    SDError result = f_stat(oem_path, &_fileinfo);
+    free(oem_path);
 
     if(result == FR_OK && timestamp != NULL) {
         // FAT packs the RTC time from get_fattime() (targets/f7/fatfs/fatfs.c).
@@ -633,7 +707,9 @@ static FS_Error storage_ext_common_remove(void* ctx, const char* path) {
     UNUSED(path);
     return FSE_NOT_READY;
 #else
-    SDError result = f_unlink(path);
+    char* oem_path = storage_ext_path_to_oem(path);
+    SDError result = f_unlink(oem_path);
+    free(oem_path);
     return storage_ext_parse_error(result);
 #endif
 }
@@ -644,7 +720,9 @@ static FS_Error storage_ext_common_mkdir(void* ctx, const char* path) {
     UNUSED(path);
     return FSE_NOT_READY;
 #else
-    SDError result = f_mkdir(path);
+    char* oem_path = storage_ext_path_to_oem(path);
+    SDError result = f_mkdir(oem_path);
+    free(oem_path);
     return storage_ext_parse_error(result);
 #endif
 }

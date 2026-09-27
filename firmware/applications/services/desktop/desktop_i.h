@@ -29,6 +29,8 @@
 #include <toolbox/path.h>
 
 #include "r0n1n_settings.h"
+#include <flipper_application/flipper_application.h>
+#include <gui/icon_i.h>
 #include "r0n1n_catalog.h"
 
 #define STATUS_BAR_Y_SHIFT 13
@@ -70,8 +72,15 @@ typedef struct {
 // R0N1N file-backed list rows (captures, search results, Hub): `app` is
 // what to launch (Loader name, .fap path or R0N1N_APP_* target), `path` its
 // argument or empty, `label` the row text.
-#define R0N1N_ENTRIES_MAX 40
+#define R0N1N_ENTRIES_MAX 64
 #define R0N1N_QUERY_SIZE  48
+
+// Icon of an SD app, from its manifest, usable wherever an Icon is
+typedef struct {
+    uint8_t data[FAP_MANIFEST_MAX_ICON_SIZE];
+    const uint8_t* frame;
+    Icon icon;
+} R0n1nIconSlot;
 
 typedef struct {
     FuriString* app;
@@ -149,6 +158,8 @@ struct Desktop {
     R0n1nSettings r0n1n;
     R0n1nEntry r0n1n_entries[R0N1N_ENTRIES_MAX];
     size_t r0n1n_entry_count;
+    R0n1nIconSlot r0n1n_icons[R0N1N_ENTRIES_MAX];
+    size_t r0n1n_icon_count;
     char search_query[R0N1N_QUERY_SIZE];
     const char* info_text; // shown by DesktopSceneInfo
     uint8_t section; // section opened from the carousel or the menu
@@ -209,6 +220,14 @@ size_t desktop_r0n1n_scan_apps(
     const char* filter,
     char (*categories)[R0N1N_CATEGORY_SIZE],
     size_t max_categories);
+
+/** Entries for `section`: its built-in apps (with 14 px `tile icons` or 10 px
+ * list icons), then the apps in its SD folders under their manifest names
+ * and icons, alphabetically. */
+void desktop_r0n1n_section_entries(Desktop* desktop, R0n1nSection section, bool tile_icons);
+
+/** How many apps `section` holds: built-in plus SD (a directory scan only). */
+size_t desktop_r0n1n_section_count(Desktop* desktop, R0n1nSection section);
 
 /** "сейчас", "5 мин", "2 ч", "3 д" relative to now. */
 void desktop_r0n1n_format_age(uint32_t timestamp, char* out, size_t size);

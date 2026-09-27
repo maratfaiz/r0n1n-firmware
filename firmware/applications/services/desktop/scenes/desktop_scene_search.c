@@ -2,7 +2,6 @@
 
 #include "desktop_scene.h"
 #include "desktop_scene_r0n1n.h"
-#include <gui/modules/text_input_i.h>
 
 // R0N1N Global Search, step 1 (hold Back on Home, docs/UX_DESIGN.md): type a
 // query with the system keyboard; results follow in DesktopSceneSearchResults,
@@ -19,8 +18,6 @@ void desktop_scene_search_on_enter(void* context) {
 
     text_input_reset(text_input);
     text_input_set_header_text(text_input, "Что найти?");
-    // A query, not a file name: keep the Cyrillic as typed
-    text_input_set_allow_unicode(text_input, true);
     text_input_set_result_callback(
         text_input,
         desktop_scene_search_text_callback,

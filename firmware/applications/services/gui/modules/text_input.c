@@ -12,10 +12,10 @@ struct TextInput {
 
 // R0N1N keyboard: three layouts cycled with one key (Russian, Latin,
 // digits/symbols). Letters take the left part of each row; the right
-// column holds Backspace, the layout key and Save. Text is UTF-8; unless the
-// caller allows Unicode (text_input_set_allow_unicode(), e.g. Search), the
-// Cyrillic is transliterated to Latin on Save, because file names on the SD
-// card (FAT, code page 850) can't hold it.
+// column holds Backspace, the layout key and Save. Text is UTF-8 and file
+// names may be Russian (the SD card works in code page 866, storage_ext.c);
+// a caller that needs ASCII can have Cyrillic transliterated to Latin on
+// Save with text_input_set_allow_unicode(false).
 typedef struct {
     const uint16_t code;
     const uint8_t x;
@@ -633,7 +633,7 @@ void text_input_reset(TextInput* text_input) {
             model->selected_column = 0;
             model->minimum_length = 1;
             model->clear_default_text = false;
-            model->allow_unicode = false;
+            model->allow_unicode = true;
             model->layout = text_input_last_layout;
             model->text_buffer = NULL;
             model->text_buffer_size = 0;

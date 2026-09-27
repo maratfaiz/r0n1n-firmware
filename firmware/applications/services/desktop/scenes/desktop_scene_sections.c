@@ -15,6 +15,7 @@ void desktop_scene_sections_on_enter(void* context) {
     r0n1n_carousel_set_title(desktop->r0n1n_carousel, profile->name);
     for(uint32_t i = 0; i < profile->section_count; i++) {
         const R0n1nSectionInfo* section = &r0n1n_sections[profile->sections[i]];
+        if(!desktop_r0n1n_section_count(desktop, profile->sections[i])) continue; // empty
         r0n1n_carousel_add_item(
             desktop->r0n1n_carousel,
             section->tile_icon,
@@ -41,9 +42,7 @@ bool desktop_scene_sections_on_event(void* context, SceneManagerEvent event) {
         DesktopSceneSections,
         r0n1n_carousel_get_position(desktop->r0n1n_carousel));
     desktop->section = section;
-    scene_manager_next_scene(
-        desktop->scene_manager,
-        section == R0n1nSectionDev ? DesktopSceneDevTools : DesktopSceneSectionApps);
+    scene_manager_next_scene(desktop->scene_manager, DesktopSceneSectionApps);
     return true;
 }
 
