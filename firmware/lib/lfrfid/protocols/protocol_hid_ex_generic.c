@@ -198,8 +198,8 @@ void protocol_hid_ex_generic_render_data(ProtocolHIDEx* protocol, FuriString* re
     // TODO FL-3518: parser and render functions
     furi_string_set(
         result,
-        "Type: Generic HID Extended\n"
-        "Data: Unknown");
+        "Тип: HID Extended (общий)\n"
+        "Данные: неизвестно");
 }
 
 const ProtocolBase protocol_hid_ex_generic = {

@@ -6,12 +6,11 @@
 
 #define TAG "Iso14443_4aPoller"
 
-#define ISO14443_4A_FSDI_256                (0x8U)
-#define ISO14443_4A_SEND_BLOCK_MAX_ATTEMPTS (20)
-#define ISO14443_4A_FWT_MAX                 (4096UL << 14)
-#define ISO14443_4A_WTXM_MASK               (0x3FU)
-#define ISO14443_4A_WTXM_MAX                (0x3BU)
-#define ISO14443_4A_SWTX                    (0xF2U)
+#define ISO14443_4A_FSDI_256  (0x8U)
+#define ISO14443_4A_FWT_MAX   (4096UL << 14)
+#define ISO14443_4A_WTXM_MASK (0x3FU)
+#define ISO14443_4A_WTXM_MAX  (0x3BU)
+#define ISO14443_4A_SWTX      (0xF2U)
 
 Iso14443_4aError iso14443_4a_poller_halt(Iso14443_4aPoller* instance) {
     furi_check(instance);
@@ -65,7 +64,7 @@ Iso14443_4aError iso14443_4a_poller_send_block(
     furi_check(rx_buffer);
 
     bit_buffer_reset(instance->tx_buffer);
-    iso14443_4_layer_encode_command(instance->iso14443_4_layer, tx_buffer, instance->tx_buffer);
+    iso14443_4_layer_encode_block(instance->iso14443_4_layer, tx_buffer, instance->tx_buffer);
 
     Iso14443_4aError error = Iso14443_4aErrorNone;
 
@@ -106,7 +105,7 @@ Iso14443_4aError iso14443_4a_poller_send_block(
             } while(bit_buffer_starts_with_byte(instance->rx_buffer, ISO14443_4A_SWTX));
         }
 
-        if(!iso14443_4_layer_decode_response(
+        if(!iso14443_4_layer_decode_block(
                instance->iso14443_4_layer, rx_buffer, instance->rx_buffer)) {
             error = Iso14443_4aErrorProtocol;
             break;
@@ -144,54 +143,5 @@ Iso14443_4aError iso14443_4a_poller_send_supervisory_block(
     bool CID_present = bit_buffer_get_size_bytes(tx_buffer) != 0;
     iso14443_4_layer_set_s_block(instance->iso14443_4_layer, deselect, CID_present);
     Iso14443_4aError error = iso14443_4a_poller_send_block(instance, tx_buffer, rx_buffer);
-    return error;
-}
-
-Iso14443_4aError iso14443_4a_poller_send_block_pwt_ext(
-    Iso14443_4aPoller* instance,
-    const BitBuffer* tx_buffer,
-    BitBuffer* rx_buffer) {
-    furi_assert(instance);
-
-    uint8_t attempts_left = ISO14443_4A_SEND_BLOCK_MAX_ATTEMPTS;
-    bit_buffer_reset(instance->tx_buffer);
-    iso14443_4_layer_encode_command(instance->iso14443_4_layer, tx_buffer, instance->tx_buffer);
-
-    Iso14443_4aError error = Iso14443_4aErrorNone;
-
-    do {
-        bit_buffer_reset(instance->rx_buffer);
-        Iso14443_3aError iso14443_3a_error = iso14443_3a_poller_send_standard_frame(
-            instance->iso14443_3a_poller,
-            instance->tx_buffer,
-            instance->rx_buffer,
-            iso14443_4a_get_fwt_fc_max(instance->data));
-
-        if(iso14443_3a_error != Iso14443_3aErrorNone) {
-            FURI_LOG_T(
-                TAG, "Attempt: %u", ISO14443_4A_SEND_BLOCK_MAX_ATTEMPTS + 1 - attempts_left);
-            FURI_LOG_RAW_T("RAW RX(%d):", bit_buffer_get_size_bytes(instance->rx_buffer));
-            for(size_t x = 0; x < bit_buffer_get_size_bytes(instance->rx_buffer); x++) {
-                FURI_LOG_RAW_T("%02X ", bit_buffer_get_byte(instance->rx_buffer, x));
-            }
-            FURI_LOG_RAW_T("\r\n");
-
-            error = iso14443_4a_process_error(iso14443_3a_error);
-            break;
-
-        } else {
-            error = iso14443_4_layer_decode_response_pwt_ext(
-                instance->iso14443_4_layer, rx_buffer, instance->rx_buffer);
-            if(error == Iso14443_4aErrorSendExtra) {
-                if(--attempts_left == 0) break;
-                // Send response for Control message
-                if(bit_buffer_get_size_bytes(rx_buffer))
-                    bit_buffer_copy(instance->tx_buffer, rx_buffer);
-                continue;
-            }
-            break;
-        }
-    } while(true);
-
     return error;
 }

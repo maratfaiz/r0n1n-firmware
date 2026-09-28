@@ -1,9 +1,8 @@
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
 
-#include <nfc/protocols/st25tb/st25tb.h>
-
+#include <flipper_application/flipper_application.h>
 #include <machine/endian.h>
+#include <nfc/protocols/st25tb/st25tb.h>
 
 #define TAG "MyKey"
 
@@ -80,24 +79,25 @@ static bool mykey_parse(const NfcDevice* device, FuriString* parsed_data) {
     furi_string_cat(parsed_data, "\e#MyKey\n");
 
     if(data->blocks[6] == 0) { // Tag is actually a MyKey but it has been bricked by a reader
-        furi_string_cat(parsed_data, "\e#Bricked!\nBlock 6 is 0!");
+        furi_string_cat(parsed_data, "\e#Карта испорчена!\nБлок 6 равен 0!");
         return true;
     }
 
     bool is_blank = mykey_is_blank(data);
-    furi_string_cat_printf(parsed_data, "Serial#: %08lX\n", (uint32_t)__bswap32(data->blocks[7]));
     furi_string_cat_printf(
-        parsed_data, "Prod. date: %02X/%02X/%04X\n", mfg_day, mfg_month, mfg_year);
-    furi_string_cat_printf(parsed_data, "Blank: %s\n", is_blank ? "yes" : "no");
-    furi_string_cat_printf(parsed_data, "LockID: %s", mykey_has_lockid(data) ? "maybe" : "no");
+        parsed_data, "Серийный #: %08lX\n", (uint32_t)__bswap32(data->blocks[7]));
+    furi_string_cat_printf(
+        parsed_data, "Дата произв.: %02X/%02X/%04X\n", mfg_day, mfg_month, mfg_year);
+    furi_string_cat_printf(parsed_data, "Пустая: %s\n", is_blank ? "да" : "нет");
+    furi_string_cat_printf(parsed_data, "LockID: %s", mykey_has_lockid(data) ? "возможно" : "нет");
 
     if(!is_blank) {
         furi_string_cat_printf(
-            parsed_data, "\nOp. count: %zu\n", (size_t)__bswap32(data->blocks[0x12] & 0xFFFFFF00));
+            parsed_data, "\nОпераций: %zu\n", (size_t)__bswap32(data->blocks[0x12] & 0xFFFFFF00));
 
         uint32_t block3C = data->blocks[0x3C];
         if(block3C == 0xFFFFFFFF) {
-            furi_string_cat(parsed_data, "No history available!");
+            furi_string_cat(parsed_data, "Истории нет!");
         } else {
             block3C ^= data->blocks[0x07];
             uint32_t startingOffset = ((block3C & 0x30000000) >> 28) |
@@ -118,8 +118,8 @@ static bool mykey_parse(const NfcDevice* device, FuriString* parsed_data) {
 
                 if(txnOffset == 8) {
                     furi_string_cat_printf(
-                        parsed_data, "Current credit: %d.%02d euros\n", credit / 100, credit % 100);
-                    furi_string_cat(parsed_data, "Op. history (newest first):");
+                        parsed_data, "Текущий баланс: %d.%02d EUR\n", credit / 100, credit % 100);
+                    furi_string_cat(parsed_data, "История (новые сверху):");
                 }
 
                 furi_string_cat_printf(

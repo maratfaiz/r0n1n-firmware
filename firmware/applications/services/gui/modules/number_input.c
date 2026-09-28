@@ -94,7 +94,7 @@ static void number_input_draw_input(Canvas* canvas, NumberInputModel* model) {
     const size_t text_x = 8;
     const size_t text_y = 25;
 
-    elements_slightly_rounded_frame(canvas, 4, 14, 120, 15);
+    elements_slightly_rounded_frame(canvas, 6, 14, 116, 15);
 
     canvas_draw_str(canvas, text_x, text_y, furi_string_get_cstr(model->text_buffer));
 }
@@ -163,26 +163,28 @@ static void number_input_handle_right(NumberInputModel* model) {
     }
 }
 
-// 0 is shown as an empty field, so an empty field reads back as 0 rather than as a
-// refusal. The starting value is clamped into the range, so the field is only ever
-// empty when 0 is a value the range allows.
-static bool number_input_get_value(NumberInputModel* model, int64_t* value) {
-    if(furi_string_empty(model->text_buffer)) {
-        *value = 0;
-        return true;
-    }
-    return strint_to_int64(furi_string_get_cstr(model->text_buffer), NULL, value, 10) ==
-           StrintParseNoError;
-}
-
 static bool is_number_too_large(NumberInputModel* model) {
     int64_t value;
-    return !number_input_get_value(model, &value) || value > (int64_t)model->max_value;
+    if(strint_to_int64(furi_string_get_cstr(model->text_buffer), NULL, &value, 10) !=
+       StrintParseNoError) {
+        return true;
+    }
+    if(value > (int64_t)model->max_value) {
+        return true;
+    }
+    return false;
 }
 
 static bool is_number_too_small(NumberInputModel* model) {
     int64_t value;
-    return !number_input_get_value(model, &value) || value < (int64_t)model->min_value;
+    if(strint_to_int64(furi_string_get_cstr(model->text_buffer), NULL, &value, 10) !=
+       StrintParseNoError) {
+        return true;
+    }
+    if(value < (int64_t)model->min_value) {
+        return true;
+    }
+    return false;
 }
 
 static void number_input_sign(NumberInputModel* model) {
@@ -213,7 +215,7 @@ static void number_input_add_digit(NumberInputModel* model, char* newChar) {
     }
     model->current_number = strtol(furi_string_get_cstr(model->text_buffer), NULL, 10);
     if(model->current_number == 0) {
-        furi_string_set(model->text_buffer, "0");
+        furi_string_reset(model->text_buffer);
     }
 }
 
@@ -221,12 +223,10 @@ static void number_input_handle_ok(NumberInputModel* model) {
     char selected = number_input_get_row(model->selected_row)[model->selected_column].text;
     char temp_str[2] = {selected, '\0'};
     if(selected == enter_symbol) {
-        int64_t value;
-        if(!number_input_get_value(model, &value) || value < (int64_t)model->min_value ||
-           value > (int64_t)model->max_value) {
+        if(is_number_too_large(model) || is_number_too_small(model)) {
             return; //Do nothing if number outside allowed range
         }
-        model->current_number = (int32_t)value;
+        model->current_number = strtol(furi_string_get_cstr(model->text_buffer), NULL, 10);
         model->callback(model->callback_context, model->current_number);
     } else if(selected == backspace_symbol) {
         number_input_backspace_cb(model);
@@ -426,8 +426,6 @@ void number_input_set_result_callback(
     int32_t max_value) {
     furi_check(number_input);
 
-    // clamped even when it is 0, so a range that excludes 0 starts on a value it allows
-    // instead of on an empty field that cannot be confirmed
     current_number = CLAMP(current_number, max_value, min_value);
 
     with_view_model(
@@ -437,11 +435,7 @@ void number_input_set_result_callback(
             model->callback = callback;
             model->callback_context = callback_context;
             model->current_number = current_number;
-            if(current_number != 0) {
-                furi_string_printf(model->text_buffer, "%ld", current_number);
-            } else {
-                furi_string_set(model->text_buffer, "");
-            }
+            furi_string_printf(model->text_buffer, "%ld", current_number);
             model->min_value = min_value;
             model->max_value = max_value;
         },

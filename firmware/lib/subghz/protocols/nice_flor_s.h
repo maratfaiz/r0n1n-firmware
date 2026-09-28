@@ -12,35 +12,11 @@ extern const SubGhzProtocolEncoder subghz_protocol_nice_flor_s_encoder;
 extern const SubGhzProtocol subghz_protocol_nice_flor_s;
 
 /**
- * Allocate SubGhzProtocolEncoderNiceFlorS.
- * @param environment Pointer to a SubGhzEnvironment instance
- * @return SubGhzProtocolEncoderNiceFlorS* pointer to a SubGhzProtocolEncoderNiceFlorS instance
- */
-void* subghz_protocol_encoder_nice_flor_s_alloc(SubGhzEnvironment* environment);
-
-/**
- * Deserialize and generating an upload to send.
- * @param context Pointer to a SubGhzProtocolEncoderNiceFlorS instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @return true On success
- */
-SubGhzProtocolStatus
-    subghz_protocol_encoder_nice_flor_s_deserialize(void* context, FlipperFormat* flipper_format);
-
-uint64_t subghz_protocol_nice_flor_s_encrypt(uint64_t data, const char* file_name);
-
-/**
  * Allocate SubGhzProtocolDecoderNiceFlorS.
  * @param environment Pointer to a SubGhzEnvironment instance
  * @return SubGhzProtocolDecoderNiceFlorS* pointer to a SubGhzProtocolDecoderNiceFlorS instance
  */
 void* subghz_protocol_decoder_nice_flor_s_alloc(SubGhzEnvironment* environment);
-
-/**
- * Reset SubGhzProtocolDecoderNiceFlorS, dropping any installer code from a loaded file.
- * @param context Pointer to a SubGhzProtocolDecoderNiceFlorS instance
- */
-void subghz_protocol_decoder_nice_flor_s_reset(void* context);
 
 /**
  * Free SubGhzProtocolDecoderNiceFlorS.
@@ -49,12 +25,25 @@ void subghz_protocol_decoder_nice_flor_s_reset(void* context);
 void subghz_protocol_decoder_nice_flor_s_free(void* context);
 
 /**
+ * Reset decoder SubGhzProtocolDecoderNiceFlorS.
+ * @param context Pointer to a SubGhzProtocolDecoderNiceFlorS instance
+ */
+void subghz_protocol_decoder_nice_flor_s_reset(void* context);
+
+/**
  * Parse a raw sequence of levels and durations received from the air.
  * @param context Pointer to a SubGhzProtocolDecoderNiceFlorS instance
  * @param level Signal level true-high false-low
  * @param duration Duration of this level in, us
  */
 void subghz_protocol_decoder_nice_flor_s_feed(void* context, bool level, uint32_t duration);
+
+/**
+ * Getting the hash sum of the last randomly received parcel.
+ * @param context Pointer to a SubGhzProtocolDecoderNiceFlorS instance
+ * @return hash Hash sum
+ */
+uint8_t subghz_protocol_decoder_nice_flor_s_get_hash_data(void* context);
 
 /**
  * Serialize data SubGhzProtocolDecoderNiceFlorS.

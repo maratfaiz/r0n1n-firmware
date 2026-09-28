@@ -40,6 +40,7 @@ Applications for main Flipper menu.
 Background services providing system APIs to applications.
 
 - `applications.h`      - Firmware application list header
+
 - `bt`                  - BLE service and application
 - `cli`                 - Console service and API
 - `crypto`              - Crypto cli tools
@@ -67,7 +68,6 @@ Small applications providing configuration for basic firmware and its services.
 - `power_settings_app`  - Basic power options
 - `storage_settings`    - Storage settings app
 - `system`              - System settings
-- `input_settings_app`  - Basic input options
 
 
 ## system

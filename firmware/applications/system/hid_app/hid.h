@@ -5,7 +5,7 @@
 #include <furi_hal_usb.h>
 #include <furi_hal_usb_hid.h>
 
-#include "helpers/ble_hid_ext_profile.h"
+#include <extra_profiles/hid_profile.h>
 
 #include <bt/bt_service/bt.h>
 #include <gui/gui.h>
@@ -18,20 +18,13 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/dialog_ex.h>
 #include <gui/modules/popup.h>
-#include <gui/modules/text_input.h>
 #include "views/hid_keynote.h"
 #include "views/hid_keyboard.h"
-#include "views/hid_numpad.h"
 #include "views/hid_media.h"
-#include "views/hid_music_macos.h"
-#include "views/hid_movie.h"
 #include "views/hid_mouse.h"
 #include "views/hid_mouse_clicker.h"
 #include "views/hid_mouse_jiggler.h"
-#include "views/hid_mouse_jiggler_stealth.h"
 #include "views/hid_tiktok.h"
-#include "views/hid_ptt.h"
-#include "views/hid_ptt_menu.h"
 
 #include "scenes/hid_scene.h"
 
@@ -41,7 +34,6 @@ typedef struct Hid Hid;
 
 struct Hid {
     FuriHalBleProfileBase* ble_hid_profile;
-    BleProfileHidExtParams ble_hid_cfg;
     Bt* bt;
     Gui* gui;
     NotificationApp* notifications;
@@ -49,33 +41,17 @@ struct Hid {
     SceneManager* scene_manager;
     Submenu* submenu;
     DialogEx* dialog;
-    TextInput* text_input;
     Popup* popup;
     HidKeynote* hid_keynote;
     HidKeyboard* hid_keyboard;
-    HidNumpad* hid_numpad;
     HidMedia* hid_media;
-    HidMusicMacos* hid_music_macos;
-    HidMovie* hid_movie;
     HidMouse* hid_mouse;
     HidMouseClicker* hid_mouse_clicker;
     HidMouseJiggler* hid_mouse_jiggler;
-    HidMouseJigglerStealth* hid_mouse_jiggler_stealth;
     HidTikTok* hid_tiktok;
-    HidPushToTalk* hid_ptt;
-    HidPushToTalkMenu* hid_ptt_menu;
 };
 
 void bt_hid_remove_pairing(Hid* app);
-void bt_hid_save_cfg(Hid* app);
-
-// Only BLE has a link to wait for, and a view model field cannot be read behind an #ifdef
-// inside a with_view_model() argument list.
-#ifdef HID_TRANSPORT_BLE
-#define hid_model_connected(model) ((model)->connected)
-#else
-#define hid_model_connected(model) (true)
-#endif
 
 void hid_hal_keyboard_press(Hid* instance, uint16_t event);
 void hid_hal_keyboard_release(Hid* instance, uint16_t event);

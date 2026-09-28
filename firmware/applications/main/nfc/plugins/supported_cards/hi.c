@@ -1,9 +1,8 @@
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
-
+#include <flipper_application/flipper_application.h>
+#include <nfc/nfc_device.h>
+#include <bit_lib/bit_lib.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
-
-#include <bit_lib.h>
 
 #define TAG "HI!"
 
@@ -154,14 +153,14 @@ static bool hi_read(Nfc* nfc, NfcDevice* device) {
         }
 
         error = mf_classic_poller_sync_read(nfc, &keys, data);
-        if(error == MfClassicErrorNotPresent) {
+        if(error != MfClassicErrorNone) {
             FURI_LOG_W(TAG, "Failed to read data");
             break;
         }
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        is_read = (error == MfClassicErrorNone);
+        is_read = mf_classic_is_card_read(data);
     } while(false);
 
     mf_classic_free(data);

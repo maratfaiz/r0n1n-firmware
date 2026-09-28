@@ -227,7 +227,7 @@ void dallas_common_render_brief_data(
     for(size_t i = 0; i < sizeof(rom_data->bytes); ++i) {
         furi_string_cat_printf(result, "%02X ", rom_data->bytes[i]);
     }
-    furi_string_cat_printf(result, "\nFamily Code: %02X\n", rom_data->bytes[0]);
+    furi_string_cat_printf(result, "\nКод семейства: %02X\n", rom_data->bytes[0]);
 
     const char* size_prefix = "";
     size_t mem_size_bits = mem_size * BITS_IN_BYTE;
@@ -244,7 +244,7 @@ void dallas_common_render_brief_data(
 }
 
 void dallas_common_render_crc_error(FuriString* result, const DallasCommonRomData* rom_data) {
-    furi_string_set(result, "\e#CRC Error\e#\n");
+    furi_string_set(result, "\e#Ошибка CRC\e#\n");
 
     const size_t data_size = sizeof(DallasCommonRomData);
 
@@ -255,7 +255,7 @@ void dallas_common_render_crc_error(FuriString* result, const DallasCommonRomDat
 
     furi_string_cat_printf(
         result,
-        "\nExpected CRC: \e!%02X\e!",
+        "\nОжидался CRC: \e!%02X\e!",
         maxim_crc8(rom_data->bytes, sizeof(DallasCommonRomData) - 1, MAXIM_CRC8_INIT));
 }
 

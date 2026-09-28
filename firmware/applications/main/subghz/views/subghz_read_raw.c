@@ -1,5 +1,4 @@
 #include "subghz_read_raw.h"
-#include "../subghz_i.h"
 
 #include <furi.h>
 #include <furi_hal.h>
@@ -7,8 +6,10 @@
 #include <gui/elements.h>
 
 #include <assets_icons.h>
+
+#define TAG "SubGhzReadRaw"
+
 #define SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE 100
-#define TAG                               "SubGhzReadRaw"
 
 struct SubGhzReadRAW {
     View* view;
@@ -22,14 +23,12 @@ typedef struct {
     FuriString* sample_write;
     FuriString* file_name;
     uint8_t* rssi_history;
-    uint8_t rssi_current;
+    uint8_t rssi_curret;
     bool rssi_history_end;
     uint8_t ind_write;
     uint8_t ind_sin;
     SubGhzReadRAWStatus status;
-    bool raw_send_only;
     float raw_threshold_rssi;
-    bool not_showing_samples;
     SubGhzRadioDeviceType device_type;
 } SubGhzReadRAWModel;
 
@@ -80,14 +79,14 @@ void subghz_read_raw_add_data_rssi(SubGhzReadRAW* instance, float rssi, bool tra
         instance->view,
         SubGhzReadRAWModel * model,
         {
-            model->rssi_current = u_rssi;
+            model->rssi_curret = u_rssi;
             if(trace) {
                 model->rssi_history[model->ind_write++] = u_rssi;
             } else {
                 model->rssi_history[model->ind_write] = u_rssi;
             }
 
-            if(model->ind_write >= SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE) {
+            if(model->ind_write > SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE) {
                 model->rssi_history_end = true;
                 model->ind_write = 0;
             }
@@ -101,10 +100,7 @@ void subghz_read_raw_update_sample_write(SubGhzReadRAW* instance, size_t sample)
     with_view_model(
         instance->view,
         SubGhzReadRAWModel * model,
-        {
-            model->not_showing_samples = false;
-            furi_string_printf(model->sample_write, "%zu spl.", sample);
-        },
+        { furi_string_printf(model->sample_write, "%zu spl.", sample); },
         false);
 }
 
@@ -214,10 +210,10 @@ void subghz_read_raw_draw_rssi(Canvas* canvas, SubGhzReadRAWModel* model) {
             canvas_draw_line(canvas, i, 47, i, 47 - model->rssi_history[i]);
         }
         canvas_draw_line(
-            canvas, model->ind_write + 1, 47, model->ind_write + 1, 47 - model->rssi_current);
+            canvas, model->ind_write + 1, 47, model->ind_write + 1, 47 - model->rssi_curret);
         if(model->ind_write > 3) {
             canvas_draw_line(
-                canvas, model->ind_write - 1, 47, model->ind_write - 1, 47 - model->rssi_current);
+                canvas, model->ind_write - 1, 47, model->ind_write - 1, 47 - model->rssi_curret);
 
             for(uint8_t i = 13; i < 47; i += width * 2) {
                 canvas_draw_line(canvas, model->ind_write, i, model->ind_write, i + width);
@@ -239,13 +235,13 @@ void subghz_read_raw_draw_rssi(Canvas* canvas, SubGhzReadRAWModel* model) {
             SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE - 1,
             47,
             SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE - 1,
-            47 - model->rssi_current);
+            47 - model->rssi_curret);
         canvas_draw_line(
             canvas,
             SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE + 1,
             47,
             SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE + 1,
-            47 - model->rssi_current);
+            47 - model->rssi_curret);
 
         for(uint8_t i = 13; i < 47; i += width * 2) {
             canvas_draw_line(
@@ -292,40 +288,30 @@ void subghz_read_raw_draw(Canvas* canvas, SubGhzReadRAWModel* model) {
     uint8_t graphics_mode = 1;
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 7, furi_string_get_cstr(model->frequency_str));
-    canvas_draw_str(canvas, 35, 7, furi_string_get_cstr(model->preset_str));
-
-    if(model->not_showing_samples) {
-        // TODO
-        canvas_draw_str(
-            canvas,
-            77,
-            7,
-            (model->device_type == SubGhzRadioDeviceTypeInternal) ? "R: Int" : "R: Ext");
-    } else {
-        canvas_draw_str(
-            canvas, 70, 7, (model->device_type == SubGhzRadioDeviceTypeInternal) ? "I" : "E");
-    }
-
+    canvas_draw_str(canvas, 0, 9, furi_string_get_cstr(model->frequency_str));
+    canvas_draw_str(canvas, 35, 9, furi_string_get_cstr(model->preset_str));
     canvas_draw_str_aligned(
-        canvas, 126, 0, AlignRight, AlignTop, furi_string_get_cstr(model->sample_write));
+        canvas, 106, 2, AlignRight, AlignTop, furi_string_get_cstr(model->sample_write));
 
+    if(model->device_type == SubGhzRadioDeviceTypeInternal) {
+        canvas_draw_icon(canvas, 109, 0, &I_Internal_ant_1_9x11);
+    } else {
+        canvas_draw_icon(canvas, 109, 0, &I_External_ant_1_9x11);
+    }
     canvas_draw_line(canvas, 0, 14, 115, 14);
     canvas_draw_line(canvas, 0, 48, 115, 48);
     canvas_draw_line(canvas, 115, 14, 115, 48);
 
     switch(model->status) {
     case SubGhzReadRAWStatusIDLE:
-        elements_button_left(canvas, "Erase");
-        elements_button_center(canvas, "Send");
-        elements_button_right(canvas, "Save");
+        elements_button_left(canvas, "Стереть");
+        elements_button_center(canvas, "Отпр.");
+        elements_button_right(canvas, "Сохр.");
         break;
     case SubGhzReadRAWStatusLoadKeyIDLE:
-        if(!model->raw_send_only) {
-            elements_button_left(canvas, "New");
-            elements_button_right(canvas, "More");
-        }
-        elements_button_center(canvas, "Send");
+        elements_button_left(canvas, "Новый");
+        elements_button_center(canvas, "Отпр.");
+        elements_button_right(canvas, "Еще");
         elements_text_box(
             canvas,
             4,
@@ -343,16 +329,16 @@ void subghz_read_raw_draw(Canvas* canvas, SubGhzReadRAWModel* model) {
     case SubGhzReadRAWStatusLoadKeyTX:
     case SubGhzReadRAWStatusLoadKeyTXRepeat:
         graphics_mode = 0;
-        elements_button_center(canvas, "Hold to repeat");
+        elements_button_center(canvas, "Держи для повтора");
         break;
 
     case SubGhzReadRAWStatusStart:
-        elements_button_left(canvas, "Config");
-        elements_button_center(canvas, "REC");
+        elements_button_left(canvas, "Настр.");
+        elements_button_center(canvas, "ЗАП");
         break;
 
     default:
-        elements_button_center(canvas, "Stop");
+        elements_button_center(canvas, "Стоп");
         break;
     }
 
@@ -462,22 +448,19 @@ bool subghz_read_raw_input(InputEvent* event, void* context) {
             instance->view,
             SubGhzReadRAWModel * model,
             {
-                if(!model->raw_send_only) {
-                    if(model->status == SubGhzReadRAWStatusStart) {
-                        //Config
-                        instance->callback(SubGhzCustomEventViewReadRAWConfig, instance->context);
-                    } else if(
-                        (model->status == SubGhzReadRAWStatusIDLE) ||
-                        (model->status == SubGhzReadRAWStatusLoadKeyIDLE)) {
-                        //Erase
-                        model->status = SubGhzReadRAWStatusStart;
-                        model->rssi_history_end = false;
-                        model->ind_write = 0;
-                        model->not_showing_samples = true;
-                        furi_string_set(model->sample_write, "0 spl.");
-                        furi_string_reset(model->file_name);
-                        instance->callback(SubGhzCustomEventViewReadRAWErase, instance->context);
-                    }
+                if(model->status == SubGhzReadRAWStatusStart) {
+                    //Config
+                    instance->callback(SubGhzCustomEventViewReadRAWConfig, instance->context);
+                } else if(
+                    (model->status == SubGhzReadRAWStatusIDLE) ||
+                    (model->status == SubGhzReadRAWStatusLoadKeyIDLE)) {
+                    //Erase
+                    model->status = SubGhzReadRAWStatusStart;
+                    model->rssi_history_end = false;
+                    model->ind_write = 0;
+                    furi_string_set(model->sample_write, "0 spl.");
+                    furi_string_reset(model->file_name);
+                    instance->callback(SubGhzCustomEventViewReadRAWErase, instance->context);
                 }
             },
             true);
@@ -486,14 +469,12 @@ bool subghz_read_raw_input(InputEvent* event, void* context) {
             instance->view,
             SubGhzReadRAWModel * model,
             {
-                if(!model->raw_send_only) {
-                    if(model->status == SubGhzReadRAWStatusIDLE) {
-                        //Save
-                        instance->callback(SubGhzCustomEventViewReadRAWSave, instance->context);
-                    } else if(model->status == SubGhzReadRAWStatusLoadKeyIDLE) {
-                        //More
-                        instance->callback(SubGhzCustomEventViewReadRAWMore, instance->context);
-                    }
+                if(model->status == SubGhzReadRAWStatusIDLE) {
+                    //Save
+                    instance->callback(SubGhzCustomEventViewReadRAWSave, instance->context);
+                } else if(model->status == SubGhzReadRAWStatusLoadKeyIDLE) {
+                    //More
+                    instance->callback(SubGhzCustomEventViewReadRAWMore, instance->context);
                 }
             },
             true);
@@ -535,7 +516,6 @@ void subghz_read_raw_set_status(
                 model->status = SubGhzReadRAWStatusStart;
                 model->rssi_history_end = false;
                 model->ind_write = 0;
-                model->not_showing_samples = true;
                 furi_string_reset(model->file_name);
                 furi_string_set(model->sample_write, "0 spl.");
                 model->raw_threshold_rssi = raw_threshold_rssi;
@@ -557,7 +537,6 @@ void subghz_read_raw_set_status(
                 model->status = SubGhzReadRAWStatusLoadKeyIDLE;
                 model->rssi_history_end = false;
                 model->ind_write = 0;
-                model->not_showing_samples = true;
                 furi_string_set(model->file_name, file_name);
                 furi_string_set(model->sample_write, "RAW");
             },
@@ -570,7 +549,6 @@ void subghz_read_raw_set_status(
             {
                 model->status = SubGhzReadRAWStatusLoadKeyIDLE;
                 if(!model->ind_write) {
-                    model->not_showing_samples = true;
                     furi_string_set(model->file_name, file_name);
                     furi_string_set(model->sample_write, "RAW");
                 } else {
@@ -609,7 +587,7 @@ void subghz_read_raw_exit(void* context) {
         true);
 }
 
-SubGhzReadRAW* subghz_read_raw_alloc(bool raw_send_only) {
+SubGhzReadRAW* subghz_read_raw_alloc(void) {
     SubGhzReadRAW* instance = malloc(sizeof(SubGhzReadRAW));
 
     // View allocation and configuration
@@ -629,7 +607,6 @@ SubGhzReadRAW* subghz_read_raw_alloc(bool raw_send_only) {
             model->preset_str = furi_string_alloc();
             model->sample_write = furi_string_alloc();
             model->file_name = furi_string_alloc();
-            model->raw_send_only = raw_send_only;
             model->rssi_history = malloc(SUBGHZ_READ_RAW_RSSI_HISTORY_SIZE * sizeof(uint8_t));
             model->raw_threshold_rssi = -127.0f;
         },

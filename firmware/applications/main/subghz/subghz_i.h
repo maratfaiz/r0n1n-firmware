@@ -1,11 +1,11 @@
 #pragma once
 
 #include "helpers/subghz_types.h"
-#include "helpers/subghz_gen_info.h"
 #include <lib/subghz/types.h>
 #include "subghz.h"
 #include "views/receiver.h"
 #include "views/transmitter.h"
+#include "views/subghz_frequency_analyzer.h"
 #include "views/subghz_read_raw.h"
 
 #include <gui/gui.h>
@@ -17,37 +17,24 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/popup.h>
 #include <gui/modules/text_input.h>
-#include <gui/modules/byte_input.h>
 #include <gui/modules/widget.h>
 
 #include <subghz/scenes/subghz_scene.h>
-#include <lib/subghz/subghz_worker.h>
-#include <lib/subghz/subghz_file_encoder_worker.h>
-#include <lib/subghz/subghz_setting.h>
-#include <lib/subghz/receiver.h>
-#include <lib/subghz/transmitter.h>
 
 #include "subghz_history.h"
-#include "subghz_last_settings.h"
 
 #include <gui/modules/variable_item_list.h>
 #include <lib/toolbox/path.h>
 
 #include "rpc/rpc_app.h"
 
+#include <power/power_service/power.h>
+
 #include "helpers/subghz_threshold_rssi.h"
 
 #include "helpers/subghz_txrx.h"
-#include "helpers/subghz_add_manually_plugin.h"
-#include "helpers/subghz_frequency_analyzer_plugin.h"
 
-#include <flipper_application/plugins/composite_resolver.h>
-#include <flipper_application/plugins/plugin_manager.h>
-
-#define SUBGHZ_MAX_LEN_NAME      64
-#define SUBGHZ_EXT_PRESET_NAME   true
-#define SUBGHZ_RAW_THRESHOLD_MIN (-90.0f)
-#define SUBGHZ_MEASURE_LOADING   false
+#define SUBGHZ_MAX_LEN_NAME 64
 
 struct SubGhz {
     Gui* gui;
@@ -61,7 +48,6 @@ struct SubGhz {
     Submenu* submenu;
     Popup* popup;
     TextInput* text_input;
-    ByteInput* byte_input;
     Widget* widget;
     DialogsApp* dialogs;
     FuriString* file_path;
@@ -73,52 +59,26 @@ struct SubGhz {
     SubGhzViewTransmitter* subghz_transmitter;
     VariableItemList* variable_item_list;
 
+    SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
     SubGhzReadRAW* subghz_read_raw;
-    bool raw_send_only;
-
-    bool save_datetime_set;
-    DateTime save_datetime;
-
-    SubGhzLastSettings* last_settings;
 
     SubGhzProtocolFlag filter;
-    SubGhzProtocolFlag ignore_filter;
     FuriString* error_str;
     SubGhzLock lock;
-
-    GenInfo* gen_info;
-
-    SubGhzFileEncoderWorker* decode_raw_file_worker_encoder;
-
     SubGhzThresholdRssi* threshold_rssi;
     SubGhzRxKeyState rx_key_state;
     SubGhzHistory* history;
-
-    // Feature plugins, mapped on demand: the analyzer while its scene is current, Add Manually
-    // until the start scene is reached again. The resolver they share is refcounted rather than
-    // owned by whichever loaded first.
-    CompositeApiResolver* api_resolver;
-    uint8_t api_resolver_refs;
-    PluginManager* freq_analyzer_plugin_manager;
-    const SubGhzFrequencyAnalyzerPlugin* freq_analyzer_plugin;
-    PluginManager* add_manually_plugin_manager;
-    const SubGhzAddManuallyPlugin* add_manually_plugin;
-
     uint16_t idx_menu_chosen;
     SubGhzLoadTypeFile load_type_file;
-    uint8_t tx_power;
     void* rpc_ctx;
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+void subghz_set_default_preset(SubGhz* subghz);
 void subghz_blink_start(SubGhz* subghz);
 void subghz_blink_stop(SubGhz* subghz);
 
 bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format);
-void subghz_dialog_message_freq_error(SubGhz* subghz, bool only_rx);
+void subghz_dialog_message_show_only_rx(SubGhz* subghz);
 
 bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog);
 bool subghz_get_next_name_file(SubGhz* subghz, uint8_t max_len);
@@ -141,10 +101,3 @@ bool subghz_is_locked(SubGhz* subghz);
 
 void subghz_rx_key_state_set(SubGhz* subghz, SubGhzRxKeyState state);
 SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
-
-extern const NotificationSequence subghz_sequence_rx;
-extern const NotificationSequence subghz_sequence_rx_locked;
-
-#ifdef __cplusplus
-}
-#endif

@@ -4,7 +4,6 @@
 typedef enum {
     SubmenuIndexEmulate,
     SubmenuIndexWrite,
-    SubmenuIndexWriteAndSetPass,
     SubmenuIndexEdit,
     SubmenuIndexRename,
     SubmenuIndexDelete,
@@ -22,23 +21,25 @@ void lfrfid_scene_saved_key_menu_on_enter(void* context) {
     Submenu* submenu = app->submenu;
 
     submenu_add_item(
-        submenu, "Emulate", SubmenuIndexEmulate, lfrfid_scene_saved_key_menu_submenu_callback, app);
-    submenu_add_item(
-        submenu, "Write", SubmenuIndexWrite, lfrfid_scene_saved_key_menu_submenu_callback, app);
-    submenu_add_item(
         submenu,
-        "Write and set password",
-        SubmenuIndexWriteAndSetPass,
+        "Эмуляция",
+        SubmenuIndexEmulate,
         lfrfid_scene_saved_key_menu_submenu_callback,
         app);
     submenu_add_item(
-        submenu, "Edit", SubmenuIndexEdit, lfrfid_scene_saved_key_menu_submenu_callback, app);
+        submenu, "Записать", SubmenuIndexWrite, lfrfid_scene_saved_key_menu_submenu_callback, app);
     submenu_add_item(
-        submenu, "Rename", SubmenuIndexRename, lfrfid_scene_saved_key_menu_submenu_callback, app);
+        submenu, "Изменить", SubmenuIndexEdit, lfrfid_scene_saved_key_menu_submenu_callback, app);
     submenu_add_item(
-        submenu, "Delete", SubmenuIndexDelete, lfrfid_scene_saved_key_menu_submenu_callback, app);
+        submenu,
+        "Переименовать",
+        SubmenuIndexRename,
+        lfrfid_scene_saved_key_menu_submenu_callback,
+        app);
     submenu_add_item(
-        submenu, "Info", SubmenuIndexInfo, lfrfid_scene_saved_key_menu_submenu_callback, app);
+        submenu, "Удалить", SubmenuIndexDelete, lfrfid_scene_saved_key_menu_submenu_callback, app);
+    submenu_add_item(
+        submenu, "Инфо", SubmenuIndexInfo, lfrfid_scene_saved_key_menu_submenu_callback, app);
 
     submenu_set_selected_item(
         submenu, scene_manager_get_scene_state(app->scene_manager, LfRfidSceneSavedKeyMenu));
@@ -57,11 +58,6 @@ bool lfrfid_scene_saved_key_menu_on_event(void* context, SceneManagerEvent event
             consumed = true;
         } else if(event.event == SubmenuIndexWrite) {
             scene_manager_next_scene(app->scene_manager, LfRfidSceneWrite);
-            consumed = true;
-        } else if(event.event == SubmenuIndexWriteAndSetPass) {
-            scene_manager_set_scene_state(
-                app->scene_manager, LfRfidSceneEnterPassword, LfRfidSceneWriteAndSetPass);
-            scene_manager_next_scene(app->scene_manager, LfRfidSceneEnterPassword);
             consumed = true;
         } else if(event.event == SubmenuIndexEdit) {
             scene_manager_next_scene(app->scene_manager, LfRfidSceneSaveData);

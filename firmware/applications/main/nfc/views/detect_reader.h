@@ -3,10 +3,6 @@
 #include <gui/view.h>
 #include <gui/modules/widget.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct DetectReader DetectReader;
 
 typedef enum {
@@ -38,7 +34,3 @@ void detect_reader_set_nonces_collected(DetectReader* detect_reader, uint16_t no
 void detect_reader_set_state(DetectReader* detect_reader, DetectReaderState state);
 
 void detect_reader_set_uid(DetectReader* detect_reader, uint8_t* uid, uint8_t uid_len);
-
-#ifdef __cplusplus
-}
-#endif

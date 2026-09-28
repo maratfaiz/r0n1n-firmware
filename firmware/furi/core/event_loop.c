@@ -310,7 +310,7 @@ void furi_event_loop_pend_callback(
 }
 
 /*
- * Private generic subscription API
+ * Private generic susbscription API
  */
 
 static void furi_event_loop_object_subscribe(

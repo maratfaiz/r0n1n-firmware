@@ -30,7 +30,7 @@ void desktop_debug_render(Canvas* canvas, void* model) {
     snprintf(
         buffer,
         sizeof(buffer),
-        "Uptime: %luh%lum%lus",
+        "Аптайм: %luч%luм%luс",
         uptime / 60 / 60,
         uptime / 60 % 60,
         uptime % 60);
@@ -43,13 +43,14 @@ void desktop_debug_render(Canvas* canvas, void* model) {
     snprintf(
         buffer,
         sizeof(buffer),
-        "%d.F%dB%dC%d %s %s",
+        "%d.F%dB%dC%d %s:%s %s",
         furi_hal_version_get_hw_version(),
         furi_hal_version_get_hw_target(),
         furi_hal_version_get_hw_body(),
         furi_hal_version_get_hw_connect(),
-        furi_hal_version_get_hw_region_name_otp(),
-        my_name ? my_name : "Unknown");
+        furi_hal_version_get_hw_region_name(),
+        furi_hal_region_get_name(),
+        my_name ? my_name : "Неизвестно");
     canvas_draw_str(canvas, 0, 19 + STATUS_BAR_Y_SHIFT, buffer);
 
     ver = furi_hal_version_get_firmware_version();
@@ -58,7 +59,7 @@ void desktop_debug_render(Canvas* canvas, void* model) {
     c2_ver = ble_glue_get_c2_info();
 #endif
     if(!ver) { //-V1051
-        canvas_draw_str(canvas, 0, 30 + STATUS_BAR_Y_SHIFT, "No info");
+        canvas_draw_str(canvas, 0, 30 + STATUS_BAR_Y_SHIFT, "Нет данных");
         return;
     }
 
@@ -76,15 +77,11 @@ void desktop_debug_render(Canvas* canvas, void* model) {
         version_get_githash(ver),
         api_major,
         api_minor,
-        c2_ver ? c2_ver->StackTypeString : "<none>");
+        c2_ver ? c2_ver->StackTypeString : "<нет>");
     canvas_draw_str(canvas, 0, 40 + STATUS_BAR_Y_SHIFT, buffer);
 
     snprintf(
-        buffer,
-        sizeof(buffer),
-        "[D:%s] %s",
-        furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug) ? "ON" : "OFF",
-        version_get_gitbranch(ver));
+        buffer, sizeof(buffer), "[%d] %s", version_get_target(ver), version_get_gitbranch(ver));
     canvas_draw_str(canvas, 0, 50 + STATUS_BAR_Y_SHIFT, buffer);
 }
 
@@ -101,9 +98,6 @@ static bool desktop_debug_input(InputEvent* event, void* context) {
 
     if(event->key == InputKeyBack && event->type == InputTypeShort) {
         debug_view->callback(DesktopDebugEventExit, debug_view->context);
-    }
-    if(event->key == InputKeyOk && event->type == InputTypeLong) {
-        debug_view->callback(DesktopDebugEventToggleDebugMode, debug_view->context);
     }
 
     return true;

@@ -1,77 +1,64 @@
 #include <furi.h>
-#include <gui/modules/submenu.h>
-#include <loader/loader.h>
+#include <assets_icons.h>
 
-#include "../desktop_i.h"
 #include "desktop_scene.h"
+#include "desktop_scene_r0n1n.h"
 
-// R0N1N Quick Actions (docs/UX_DESIGN.md): reuses the existing FavoriteApp
-// slots (configured today under Settings > Desktop) as a single list reached
-// from Up-short, instead of each slot only being reachable by its own D-pad
-// shortcut. Stage 1 deliberately doesn't add a separate/customizable
-// quick-action storage -- it lists the same five slots that already exist.
-static const char* const desktop_favorites_labels[FavoriteAppNumber] = {
-    [FavoriteAppLeftShort] = "Left",
-    [FavoriteAppLeftLong] = "Left (hold)",
-    [FavoriteAppRightShort] = "Right",
-    [FavoriteAppRightLong] = "Right (hold)",
-    [FavoriteAppOkLong] = "OK (hold)",
-};
+// R0N1N Quick Actions (Up on Home, docs/UX_DESIGN.md): six configurable
+// slots as a 3x2 grid of 14 px icons; the selected slot's name is the caption.
+// Hold OK on a tile to reassign it (DesktopSceneAppPicker).
 
-static inline bool desktop_scene_favorites_check_none(const char* str) {
-    return (str[1] == '\0' && str[0] == '?');
-}
-
-static void desktop_scene_favorites_submenu_callback(void* context, uint32_t index) {
-    Desktop* desktop = context;
-    view_dispatcher_send_custom_event(desktop->view_dispatcher, index);
-}
+static const char* const desktop_quick_not_installed =
+    "Приложения нет на SD.\nУдерживайте OK на плитке,\nчтобы выбрать другое.";
 
 void desktop_scene_favorites_on_enter(void* context) {
     Desktop* desktop = context;
-    Submenu* submenu = desktop->favorites_submenu;
-    submenu_reset(submenu);
+    R0n1nGrid* grid = desktop->r0n1n_grid;
 
-    for(size_t i = 0; i < FavoriteAppNumber; i++) {
-        const char* path = desktop->settings.favorite_apps[i].name_or_path;
-        FuriString* label = furi_string_alloc_printf(
-            "%s: %s",
-            desktop_favorites_labels[i],
-            (strlen(path) == 0)      ? "Apps Menu" :
-            desktop_scene_favorites_check_none(path) ? "(none)" :
-                                                        path);
-        submenu_add_item(
-            submenu,
-            furi_string_get_cstr(label),
-            i,
-            desktop_scene_favorites_submenu_callback,
-            desktop);
-        furi_string_free(label);
+    desktop_r0n1n_prepare_grid(desktop);
+    r0n1n_grid_set_title(grid, &I_R_Star_9x7, "Избранное");
+    r0n1n_grid_set_layout(grid, 3, 41, 19, 12);
+
+    FuriString* label = furi_string_alloc();
+    for(uint32_t i = 0; i < R0N1N_QUICK_SLOTS; i++) {
+        const char* target = desktop->r0n1n.quick[i];
+        const R0n1nApp* app = r0n1n_catalog_find(target);
+        if(app) {
+            r0n1n_grid_add_item(grid, app->tile_icon, app->label, false, i);
+        } else {
+            desktop_app_display_name(target, label);
+            r0n1n_grid_add_item(grid, &A_Plugins_14, furi_string_get_cstr(label), false, i);
+        }
     }
+    furi_string_free(label);
 
-    view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdFavorites);
+    r0n1n_grid_set_selected_item(
+        grid, scene_manager_get_scene_state(desktop->scene_manager, DesktopSceneFavorites));
+    view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdR0n1nGrid);
 }
 
 bool desktop_scene_favorites_on_event(void* context, SceneManagerEvent event) {
     Desktop* desktop = context;
-    bool consumed = false;
+    if(event.type != SceneManagerEventTypeCustom) return false;
 
-    if(event.type == SceneManagerEventTypeCustom) {
-        furi_assert(event.event < FavoriteAppNumber);
-        const char* path = desktop->settings.favorite_apps[event.event].name_or_path;
-        if(strlen(path) == 0) {
-            loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, NULL);
-        } else if(!desktop_scene_favorites_check_none(path)) {
-            loader_start_detached_with_gui_error(desktop->loader, path, NULL);
+    const uint32_t kind = event.event & R0N1N_EVT_KIND;
+    const uint32_t slot = event.event & R0N1N_EVT_VALUE;
+    if(slot >= R0N1N_QUICK_SLOTS) return false;
+
+    scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneFavorites, slot);
+    if(kind == R0N1N_EVT_OK) {
+        if(!desktop_r0n1n_launch(desktop, desktop->r0n1n.quick[slot], NULL)) {
+            desktop_r0n1n_show_info(desktop, desktop_quick_not_installed);
         }
-        scene_manager_previous_scene(desktop->scene_manager);
-        consumed = true;
+        return true;
+    } else if(kind == R0N1N_EVT_HOLD) {
+        desktop->picker_slot = slot;
+        scene_manager_next_scene(desktop->scene_manager, DesktopSceneAppPicker);
+        return true;
     }
-
-    return consumed;
+    return false;
 }
 
 void desktop_scene_favorites_on_exit(void* context) {
-    Desktop* desktop = context;
-    submenu_reset(desktop->favorites_submenu);
+    UNUSED(context);
 }

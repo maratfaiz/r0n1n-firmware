@@ -20,7 +20,6 @@
 #include <nfc/protocols/mf_ultralight/mf_ultralight.h>
 #include <nfc/protocols/mf_classic/mf_classic.h>
 #include <nfc/protocols/slix/slix.h>
-#include <nfc/protocols/type_4_tag/type_4_tag.h>
 
 #include <bit_lib.h>
 #include <toolbox/pretty_format.h>
@@ -32,8 +31,7 @@
 #define NDEF_PROTO_UL      (1)
 #define NDEF_PROTO_MFC     (2)
 #define NDEF_PROTO_SLIX    (3)
-#define NDEF_PROTO_T4T     (4)
-#define NDEF_PROTO_TOTAL   (5)
+#define NDEF_PROTO_TOTAL   (4)
 
 #ifndef NDEF_PROTO
 #error Must specify what protocol to use with NDEF_PROTO define!
@@ -45,7 +43,7 @@
 #define NDEF_TITLE(device, parsed_data)    \
     furi_string_printf(                    \
         parsed_data,                       \
-        "\e#NDEF Format Data\nCard: %s\n", \
+        "\e#Данные NDEF\nТип карты: %s\n", \
         nfc_device_get_name(device, NfcDeviceNameTypeFull))
 
 // ---=== structures ===---
@@ -153,11 +151,6 @@ typedef struct {
         const uint8_t* start;
         size_t size;
     } slix;
-#elif NDEF_PROTO == NDEF_PROTO_T4T
-    struct {
-        const uint8_t* data;
-        size_t size;
-    } t4t;
 #endif
 } Ndef;
 
@@ -235,13 +228,6 @@ static bool ndef_get(Ndef* ndef, size_t pos, size_t len, void* buf) {
     // Memory space is contiguous, simply need to remap to data pointer
     if(pos + len > ndef->slix.size) return false;
     memcpy(buf, ndef->slix.start + pos, len);
-    return true;
-
-#elif NDEF_PROTO == NDEF_PROTO_T4T
-
-    // Memory space is contiguous, simply need to remap to data pointer
-    if(pos + len > ndef->t4t.size) return false;
-    memcpy(buf, ndef->t4t.data + pos, len);
     return true;
 
 #else
@@ -343,10 +329,10 @@ static bool ndef_parse_uri(Ndef* ndef, size_t pos, size_t len) {
         if(strncmp(prepend, "http", 4) == 0) {
             type = "URL";
         } else if(strncmp(prepend, "tel:", 4) == 0) {
-            type = "Phone";
+            type = "Телефон";
             prepend = ""; // Not NULL to avoid schema check below, only want to hide it from output
         } else if(strncmp(prepend, "mailto:", 7) == 0) {
-            type = "Mail";
+            type = "Почта";
             prepend = ""; // Not NULL to avoid schema check below, only want to hide it from output
         }
     }
@@ -358,11 +344,11 @@ static bool ndef_parse_uri(Ndef* ndef, size_t pos, size_t len) {
         if(strncmp(schema, "http", 4) == 0) {
             type = "URL";
         } else if(strncmp(schema, "tel:", 4) == 0) {
-            type = "Phone";
+            type = "Телефон";
             pos += 4;
             len -= 4;
         } else if(strncmp(schema, "mailto:", 7) == 0) {
-            type = "Mail";
+            type = "Почта";
             pos += 7;
             len -= 7;
         }
@@ -402,7 +388,7 @@ static bool ndef_parse_uri(Ndef* ndef, size_t pos, size_t len) {
 }
 
 static bool ndef_parse_text(Ndef* ndef, size_t pos, size_t len) {
-    furi_string_cat(ndef->output, "Text\n");
+    furi_string_cat(ndef->output, "Текст\n");
     if(!ndef_dump(ndef, NULL, pos + 3, len - 3, false)) return false;
     return true;
 }
@@ -473,7 +459,7 @@ static bool ndef_parse_vcard(Ndef* ndef, size_t pos, size_t len) {
         }
     }
 
-    furi_string_cat(ndef->output, "Contact\n");
+    furi_string_cat(ndef->output, "Контакт\n");
     ndef_dump(ndef, NULL, pos, len, false);
 
     return true;
@@ -549,7 +535,7 @@ static bool ndef_parse_wifi(Ndef* ndef, size_t pos, size_t len) {
                     const char* auth;
                     switch(auth_type) {
                     case AUTH_TYPE_OPEN:
-                        auth = "Open";
+                        auth = "Открыт";
                         break;
                     case AUTH_TYPE_WPA_PSK:
                         auth = "WPA Personal";
@@ -567,7 +553,7 @@ static bool ndef_parse_wifi(Ndef* ndef, size_t pos, size_t len) {
                         auth = "WPA/WPA2 Personal";
                         break;
                     default:
-                        auth = "Unknown";
+                        auth = "Неизвестно";
                         break;
                     }
                     ndef_print(ndef, "AUTH", auth, strlen(auth), false);
@@ -582,7 +568,7 @@ static bool ndef_parse_wifi(Ndef* ndef, size_t pos, size_t len) {
         pos += field_len;
     }
 
-    furi_string_cat(ndef->output, "No data parsed\n");
+    furi_string_cat(ndef->output, "Данные не разобраны\n");
     return true;
 }
 
@@ -607,14 +593,14 @@ bool ndef_parse_record(
     uint8_t type_len) {
     FURI_LOG_D(TAG, "payload type: %.*s len: %hu pos: %zu", type_len, type, len, pos);
     if(!len) {
-        furi_string_cat(ndef->output, "Empty\n");
+        furi_string_cat(ndef->output, "Пусто\n");
         return true;
     }
 
     switch(tnf) {
     case NdefTnfWellKnownType:
         if(strncmp("Sp", type, type_len) == 0) {
-            furi_string_cat(ndef->output, "SmartPoster\nContained records below\n\n");
+            furi_string_cat(ndef->output, "SmartPoster\nЗаписи ниже\n\n");
             return ndef_parse_message(ndef, pos, len, 0, true);
         } else if(strncmp("U", type, type_len) == 0) {
             return ndef_parse_uri(ndef, pos, len);
@@ -622,8 +608,8 @@ bool ndef_parse_record(
             return ndef_parse_text(ndef, pos, len);
         }
         // Dump data without parsing
-        furi_string_cat(ndef->output, "Unknown\n");
-        ndef_print(ndef, "Well-known Type", type, type_len, false);
+        furi_string_cat(ndef->output, "Неизвестно\n");
+        ndef_print(ndef, "Стандартный тип", type, type_len, false);
         if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
         return true;
 
@@ -636,8 +622,8 @@ bool ndef_parse_record(
             return ndef_parse_wifi(ndef, pos, len);
         }
         // Dump data without parsing
-        furi_string_cat(ndef->output, "Unknown\n");
-        ndef_print(ndef, "Media Type", type, type_len, false);
+        furi_string_cat(ndef->output, "Неизвестно\n");
+        ndef_print(ndef, "MIME-тип", type, type_len, false);
         if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
         return true;
 
@@ -649,9 +635,9 @@ bool ndef_parse_record(
     case NdefTnfReserved:
     default:
         // Dump data without parsing
-        furi_string_cat(ndef->output, "Unsupported\n");
-        ndef_print(ndef, "Type name format", &tnf, 1, true);
-        ndef_print(ndef, "Type", type, type_len, false);
+        furi_string_cat(ndef->output, "Не поддерживается\n");
+        ndef_print(ndef, "Формат типа", &tnf, 1, true);
+        ndef_print(ndef, "Тип", type, type_len, false);
         if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
         return true;
     }
@@ -826,8 +812,7 @@ static bool ndef_ul_parse(const NfcDevice* device, FuriString* parsed_data) {
     const MfUltralightData* data = nfc_device_get_data(device, NfcProtocolMfUltralight);
 
     // Check card type can contain NDEF
-    if(data->type != MfUltralightTypeNTAG203 && data->type != MfUltralightTypeNTAG210 &&
-       data->type != MfUltralightTypeNTAG212 && data->type != MfUltralightTypeNTAG213 &&
+    if(data->type != MfUltralightTypeNTAG203 && data->type != MfUltralightTypeNTAG213 &&
        data->type != MfUltralightTypeNTAG215 && data->type != MfUltralightTypeNTAG216 &&
        data->type != MfUltralightTypeNTAGI2C1K && data->type != MfUltralightTypeNTAGI2C2K &&
        data->type != MfUltralightTypeNTAGI2CPlus1K &&
@@ -894,7 +879,7 @@ static bool ndef_mfc_parse(const NfcDevice* device, FuriString* parsed_data) {
 
     // Check card type can contain NDEF
     if(data->type != MfClassicType1k && data->type != MfClassicType4k &&
-       data->type != MfClassicTypeMini && data->type != MfClassicType2k) {
+       data->type != MfClassicTypeMini) {
         return false;
     }
 
@@ -1054,44 +1039,6 @@ static bool ndef_slix_parse(const NfcDevice* device, FuriString* parsed_data) {
     return parsed > 0;
 }
 
-#elif NDEF_PROTO == NDEF_PROTO_T4T
-
-static bool ndef_t4t_parse(const NfcDevice* device, FuriString* parsed_data) {
-    furi_assert(device);
-    furi_assert(parsed_data);
-
-    const Type4TagData* data = nfc_device_get_data(device, NfcProtocolType4Tag);
-    size_t data_start = 0;
-    size_t data_size = simple_array_get_count(data->ndef_data);
-
-    NDEF_TITLE(device, parsed_data);
-
-    furi_string_replace(parsed_data, "Card: ", "Protocol: ");
-    if(data->is_tag_specific && !furi_string_empty(data->platform_name)) {
-        furi_string_cat_printf(
-            parsed_data, "Card: %s\n", furi_string_get_cstr(data->platform_name));
-    }
-
-    Ndef ndef = {
-        .output = parsed_data,
-        .t4t =
-            {
-                .data = data_size == 0 ? NULL : simple_array_cget_data(data->ndef_data),
-                .size = data_size,
-            },
-    };
-    size_t parsed = ndef_parse_message(&ndef, data_start, data_size - data_start, 1, false);
-
-    if(parsed) {
-        furi_string_trim(parsed_data, "\n");
-        furi_string_cat(parsed_data, "\n");
-    } else {
-        furi_string_reset(parsed_data);
-    }
-
-    return parsed > 0;
-}
-
 #endif
 
 // ---=== boilerplate ===---
@@ -1109,9 +1056,6 @@ static const NfcSupportedCardsPlugin ndef_plugin = {
 #elif NDEF_PROTO == NDEF_PROTO_SLIX
     .parse = ndef_slix_parse,
     .protocol = NfcProtocolSlix,
-#elif NDEF_PROTO == NDEF_PROTO_T4T
-    .parse = ndef_t4t_parse,
-    .protocol = NfcProtocolType4Tag,
 #endif
 };
 

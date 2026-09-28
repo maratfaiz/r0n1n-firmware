@@ -4,13 +4,15 @@
 #include <lib/subghz/protocols/raw.h>
 #include <toolbox/path.h>
 
-#define RAW_FILE_NAME "RAW_"
-#define TAG           "SubGhzSceneReadRAW"
+#define TAG "SubGhzSceneReadRaw"
+
+#define RAW_FILE_NAME "Raw_signal_"
 
 bool subghz_scene_read_raw_update_filename(SubGhz* subghz) {
     bool ret = false;
     //set the path to read the file
-    FuriString* temp_str = furi_string_alloc();
+    FuriString* temp_str;
+    temp_str = furi_string_alloc();
     do {
         FlipperFormat* fff_data = subghz_txrx_get_fff_data(subghz->txrx);
         if(!flipper_format_rewind(fff_data)) {
@@ -39,11 +41,7 @@ static void subghz_scene_read_raw_update_statusbar(void* context) {
     FuriString* frequency_str = furi_string_alloc();
     FuriString* modulation_str = furi_string_alloc();
 
-#ifdef SUBGHZ_EXT_PRESET_NAME
-    subghz_txrx_get_frequency_and_modulation(subghz->txrx, frequency_str, modulation_str, true);
-#else
-    subghz_txrx_get_frequency_and_modulation(subghz->txrx, frequency_str, modulation_str, false);
-#endif
+    subghz_txrx_get_frequency_and_modulation(subghz->txrx, frequency_str, modulation_str);
     subghz_read_raw_add_data_statusbar(
         subghz->subghz_read_raw,
         furi_string_get_cstr(frequency_str),
@@ -105,15 +103,8 @@ void subghz_scene_read_raw_on_enter(void* context) {
     if((subghz_rx_key_state_get(subghz) != SubGhzRxKeyStateBack) &&
        (subghz_rx_key_state_get(subghz) != SubGhzRxKeyStateRAWLoad)) {
         subghz_rx_key_state_set(subghz, SubGhzRxKeyStateIDLE);
-
-        if(furi_string_empty(file_name)) {
-            subghz_txrx_set_preset_internal(
-                subghz->txrx,
-                subghz->last_settings->frequency,
-                subghz->last_settings->preset_index,
-                subghz->last_settings->tx_power);
-        }
     }
+    furi_string_free(file_name);
     subghz_scene_read_raw_update_statusbar(subghz);
 
     //set callback view raw
@@ -123,8 +114,6 @@ void subghz_scene_read_raw_on_enter(void* context) {
 
     //set filter RAW feed
     subghz_txrx_receiver_set_filter(subghz->txrx, SubGhzProtocolFlag_RAW);
-    furi_string_free(file_name);
-
     view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdReadRAW);
 }
 
@@ -145,19 +134,10 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
             if((subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateAddKey) ||
                (subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateBack)) {
                 subghz_rx_key_state_set(subghz, SubGhzRxKeyStateExit);
-                if(subghz_scene_read_raw_update_filename(subghz)) {
-                    furi_string_set(subghz->file_path_tmp, subghz->file_path);
-                } else {
-                    furi_string_reset(subghz->file_path_tmp);
-                }
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneNeedSaving);
             } else {
                 //Restore default setting
-                if(subghz->raw_send_only) {
-                    subghz_txrx_set_default_preset(subghz->txrx, 0);
-                } else {
-                    subghz_txrx_set_default_preset(subghz->txrx, subghz->last_settings->frequency);
-                }
+                subghz_set_default_preset(subghz);
                 if(!scene_manager_search_and_switch_to_previous_scene(
                        subghz->scene_manager, SubGhzSceneSaved)) {
                     if(!scene_manager_search_and_switch_to_previous_scene(
@@ -184,8 +164,7 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
             break;
 
         case SubGhzCustomEventViewReadRAWErase:
-            if((subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateAddKey) ||
-               (subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateBack)) {
+            if(subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateAddKey) {
                 if(subghz_scene_read_raw_update_filename(subghz)) {
                     furi_string_set(subghz->file_path_tmp, subghz->file_path);
                     subghz_delete_file(subghz);
@@ -223,11 +202,7 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
             if(subghz_file_available(subghz) && subghz_scene_read_raw_update_filename(subghz)) {
                 //start send
                 subghz->state_notifications = SubGhzNotificationStateIDLE;
-                const bool sending =
-                    subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
-                //TX start is also where a lost external module is noticed
-                subghz_scene_read_raw_update_statusbar(subghz);
-                if(!sending) {
+                if(!subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx))) {
                     subghz_rx_key_state_set(subghz, SubGhzRxKeyStateBack);
                     subghz_read_raw_set_status(
                         subghz->subghz_read_raw,
@@ -300,12 +275,10 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
                 if(subghz_protocol_raw_save_to_file_init(decoder_raw, RAW_FILE_NAME, &preset)) {
                     dolphin_deed(DolphinDeedSubGhzRawRec);
                     subghz_txrx_rx_start(subghz->txrx);
-                    //RX start may have fallen back to the internal radio
-                    subghz_scene_read_raw_update_statusbar(subghz);
                     subghz->state_notifications = SubGhzNotificationStateRx;
                     subghz_rx_key_state_set(subghz, SubGhzRxKeyStateAddKey);
                 } else {
-                    furi_string_set(subghz->error_str, "Function requires\nan SD card.");
+                    furi_string_set(subghz->error_str, "Нужна SD-карта.");
                     scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
                 }
             }

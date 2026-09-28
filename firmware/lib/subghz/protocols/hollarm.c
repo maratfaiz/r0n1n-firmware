@@ -4,9 +4,6 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
-
-#include "../blocks/custom_btn_i.h"
 
 #define TAG "SubGhzProtocolHollarm"
 
@@ -23,7 +20,6 @@ struct SubGhzProtocolDecoderHollarm {
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderHollarm);
 
 struct SubGhzProtocolEncoderHollarm {
     SubGhzProtocolEncoderBase base;
@@ -31,7 +27,6 @@ struct SubGhzProtocolEncoderHollarm {
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderHollarm);
 
 typedef enum {
     HollarmDecoderStepReset = 0,
@@ -41,32 +36,31 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_hollarm_decoder = {
     .alloc = subghz_protocol_decoder_hollarm_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_hollarm_free,
 
     .feed = subghz_protocol_decoder_hollarm_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_hollarm_reset,
 
-    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
-    .serialize = subghz_protocol_decoder_common_serialize,
+    .get_hash_data = subghz_protocol_decoder_hollarm_get_hash_data,
+    .serialize = subghz_protocol_decoder_hollarm_serialize,
     .deserialize = subghz_protocol_decoder_hollarm_deserialize,
     .get_string = subghz_protocol_decoder_hollarm_get_string,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_hollarm_encoder = {
     .alloc = subghz_protocol_encoder_hollarm_alloc,
-    .free = subghz_protocol_encoder_common_free,
+    .free = subghz_protocol_encoder_hollarm_free,
 
     .deserialize = subghz_protocol_encoder_hollarm_deserialize,
-    .stop = subghz_protocol_encoder_common_stop,
-    .yield = subghz_protocol_encoder_common_yield,
+    .stop = subghz_protocol_encoder_hollarm_stop,
+    .yield = subghz_protocol_encoder_hollarm_yield,
 };
 
 const SubGhzProtocol subghz_protocol_hollarm = {
     .name = SUBGHZ_PROTOCOL_HOLLARM_NAME,
     .type = SubGhzProtocolTypeStatic,
     .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable |
-            SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save | SubGhzProtocolFlag_Send |
-            SubGhzProtocolFlag_Alarms,
+            SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save | SubGhzProtocolFlag_Send,
 
     .decoder = &subghz_protocol_hollarm_decoder,
     .encoder = &subghz_protocol_hollarm_encoder,
@@ -74,76 +68,23 @@ const SubGhzProtocol subghz_protocol_hollarm = {
 
 void* subghz_protocol_encoder_hollarm_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderHollarm), &subghz_protocol_hollarm, 3, 128);
+    SubGhzProtocolEncoderHollarm* instance = malloc(sizeof(SubGhzProtocolEncoderHollarm));
+
+    instance->base.protocol = &subghz_protocol_hollarm;
+    instance->generic.protocol_name = instance->base.protocol->name;
+
+    instance->encoder.repeat = 10;
+    instance->encoder.size_upload = 256;
+    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
+    instance->encoder.is_running = false;
+    return instance;
 }
 
-// Get custom button code
-static uint8_t subghz_protocol_hollarm_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x2;
-            break;
-        case 0x2:
-            btn = 0x1;
-            break;
-        case 0x4:
-            btn = 0x1;
-            break;
-        case 0x8:
-            btn = 0x1;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x4;
-            break;
-        case 0x2:
-            btn = 0x4;
-            break;
-        case 0x4:
-            btn = 0x2;
-            break;
-        case 0x8:
-            btn = 0x4;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x8;
-            break;
-        case 0x2:
-            btn = 0x8;
-            break;
-        case 0x4:
-            btn = 0x8;
-            break;
-        case 0x8:
-            btn = 0x2;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
+void subghz_protocol_encoder_hollarm_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolEncoderHollarm* instance = context;
+    free(instance->encoder.upload);
+    free(instance);
 }
 
 /**
@@ -153,14 +94,7 @@ static uint8_t subghz_protocol_hollarm_get_btn_code(void) {
 static void subghz_protocol_encoder_hollarm_get_upload(SubGhzProtocolEncoderHollarm* instance) {
     furi_assert(instance);
 
-    // Generate new key using custom or default button
-    instance->generic.btn = subghz_protocol_hollarm_get_btn_code();
-
-    // override button if we change it with signal settings button editor
-    if(subghz_block_generic_global_button_override_get(&instance->generic.btn)) {
-        FURI_LOG_D(TAG, "Button sucessfully changed to 0x%X", instance->generic.btn);
-    }
-
+    // Generate new key
     uint64_t new_key = (instance->generic.data >> 12) << 12 | (instance->generic.btn << 8);
 
     uint8_t bytesum = ((new_key >> 32) & 0xFF) + ((new_key >> 24) & 0xFF) +
@@ -212,12 +146,6 @@ static void subghz_protocol_hollarm_remote_controller(SubGhzBlockGeneric* instan
     instance->btn = (instance->data >> 8) & 0xF;
     instance->serial = (instance->data & 0xFFFFFFF0000) >> 16;
 
-    // Save original button for later use
-    if(subghz_custom_btn_get_original() == 0) {
-        subghz_custom_btn_set_original(instance->btn);
-    }
-    subghz_custom_btn_set_max(3);
-
     // Hollarm Decoder
     // 09.2024 - @xMasterX (MMX)
     // Thanks @Skorpionm for support!
@@ -247,12 +175,13 @@ SubGhzProtocolStatus
         if(ret != SubGhzProtocolStatusOk) {
             break;
         }
-        // Optional value
+        //optional parameter parameter
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
         subghz_protocol_hollarm_remote_controller(&instance->generic);
         subghz_protocol_encoder_hollarm_get_upload(instance);
+        instance->encoder.front = 0;
 
         if(!flipper_format_rewind(flipper_format)) {
             FURI_LOG_E(TAG, "Rewind error");
@@ -273,10 +202,48 @@ SubGhzProtocolStatus
     return ret;
 }
 
+void subghz_protocol_encoder_hollarm_stop(void* context) {
+    SubGhzProtocolEncoderHollarm* instance = context;
+    instance->encoder.is_running = false;
+    instance->encoder.front = 0;
+}
+
+LevelDuration subghz_protocol_encoder_hollarm_yield(void* context) {
+    SubGhzProtocolEncoderHollarm* instance = context;
+
+    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
+        instance->encoder.is_running = false;
+        return level_duration_reset();
+    }
+
+    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
+
+    if(++instance->encoder.front == instance->encoder.size_upload) {
+        instance->encoder.repeat--;
+        instance->encoder.front = 0;
+    }
+
+    return ret;
+}
+
 void* subghz_protocol_decoder_hollarm_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderHollarm), &subghz_protocol_hollarm);
+    SubGhzProtocolDecoderHollarm* instance = malloc(sizeof(SubGhzProtocolDecoderHollarm));
+    instance->base.protocol = &subghz_protocol_hollarm;
+    instance->generic.protocol_name = instance->base.protocol->name;
+    return instance;
+}
+
+void subghz_protocol_decoder_hollarm_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderHollarm* instance = context;
+    free(instance);
+}
+
+void subghz_protocol_decoder_hollarm_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderHollarm* instance = context;
+    instance->decoder.parser_step = HollarmDecoderStepReset;
 }
 
 void subghz_protocol_decoder_hollarm_feed(void* context, bool level, volatile uint32_t duration) {
@@ -389,6 +356,22 @@ static const char* subghz_protocol_hollarm_get_button_name(uint8_t btn) {
     return btn <= 0xf ? name_btn[btn] : name_btn[0];
 }
 
+uint8_t subghz_protocol_decoder_hollarm_get_hash_data(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderHollarm* instance = context;
+    return subghz_protocol_blocks_get_hash_data(
+        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
+}
+
+SubGhzProtocolStatus subghz_protocol_decoder_hollarm_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset) {
+    furi_assert(context);
+    SubGhzProtocolDecoderHollarm* instance = context;
+    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+}
+
 SubGhzProtocolStatus
     subghz_protocol_decoder_hollarm_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
@@ -407,12 +390,6 @@ void subghz_protocol_decoder_hollarm_get_string(void* context, FuriString* outpu
     uint8_t bytesum =
         ((instance->generic.data >> 32) & 0xFF) + ((instance->generic.data >> 24) & 0xFF) +
         ((instance->generic.data >> 16) & 0xFF) + ((instance->generic.data >> 8) & 0xFF);
-
-    // push protocol data to global variable
-    subghz_block_generic_global.btn_is_available = true;
-    subghz_block_generic_global.current_btn = instance->generic.btn;
-    subghz_block_generic_global.btn_length_bit = 4;
-    //
 
     furi_string_cat_printf(
         output,

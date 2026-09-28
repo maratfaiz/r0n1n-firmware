@@ -5,6 +5,8 @@
 
 #include "dallas_common.h"
 
+#include "../blanks/tm2004.h"
+
 #define DS1992_FAMILY_CODE 0x08U
 #define DS1992_FAMILY_NAME "DS1992"
 
@@ -29,6 +31,7 @@ typedef struct {
 } DS1992ProtocolData;
 
 static bool dallas_ds1992_read(OneWireHost*, void*);
+static bool dallas_ds1992_write_id(OneWireHost*, iButtonProtocolData*);
 static bool dallas_ds1992_write_copy(OneWireHost*, iButtonProtocolData*);
 static void dallas_ds1992_emulate(OneWireSlave*, iButtonProtocolData*);
 static bool dallas_ds1992_load(FlipperFormat*, uint32_t, iButtonProtocolData*);
@@ -43,13 +46,14 @@ static void dallas_ds1992_apply_edits(iButtonProtocolData*);
 
 const iButtonProtocolDallasBase ibutton_protocol_ds1992 = {
     .family_code = DS1992_FAMILY_CODE,
-    .features = iButtonProtocolFeatureExtData | iButtonProtocolFeatureWriteCopy,
-    .write_targets = IBUTTON_WRITE_TARGET_BIT(iButtonWriteTargetTM2004),
+    .features = iButtonProtocolFeatureExtData | iButtonProtocolFeatureWriteId |
+                iButtonProtocolFeatureWriteCopy,
     .data_size = sizeof(DS1992ProtocolData),
     .manufacturer = DALLAS_COMMON_MANUFACTURER_NAME,
     .name = DS1992_FAMILY_NAME,
 
     .read = dallas_ds1992_read,
+    .write_id = dallas_ds1992_write_id,
     .write_copy = dallas_ds1992_write_copy,
     .emulate = dallas_ds1992_emulate,
     .save = dallas_ds1992_save,
@@ -67,6 +71,11 @@ bool dallas_ds1992_read(OneWireHost* host, iButtonProtocolData* protocol_data) {
     DS1992ProtocolData* data = protocol_data;
     return onewire_host_reset(host) && dallas_common_read_rom(host, &data->rom_data) &&
            dallas_common_read_mem(host, 0, data->sram_data, DS1992_SRAM_DATA_SIZE);
+}
+
+bool dallas_ds1992_write_id(OneWireHost* host, iButtonProtocolData* protocol_data) {
+    DS1992ProtocolData* data = protocol_data;
+    return tm2004_write(host, data->rom_data.bytes, sizeof(DallasCommonRomData));
 }
 
 bool dallas_ds1992_write_copy(OneWireHost* host, iButtonProtocolData* protocol_data) {
@@ -182,7 +191,7 @@ void dallas_ds1992_render_uid(FuriString* result, const iButtonProtocolData* pro
 void dallas_ds1992_render_data(FuriString* result, const iButtonProtocolData* protocol_data) {
     const DS1992ProtocolData* data = protocol_data;
 
-    furi_string_cat_printf(result, "\e#Memory Data\n--------------------\n");
+    furi_string_cat_printf(result, "\e#Данные памяти\n--------------------\n");
 
     pretty_format_bytes_hex_canonical(
         result,

@@ -14,16 +14,16 @@ void bad_usb_scene_confirm_unpair_on_enter(void* context) {
     Widget* widget = bad_usb->widget;
 
     widget_add_button_element(
-        widget, GuiButtonTypeLeft, "Cancel", bad_usb_scene_confirm_unpair_widget_callback, context);
+        widget, GuiButtonTypeLeft, "Отмена", bad_usb_scene_confirm_unpair_widget_callback, context);
     widget_add_button_element(
         widget,
         GuiButtonTypeRight,
-        "Unpair",
+        "Удалить",
         bad_usb_scene_confirm_unpair_widget_callback,
         context);
 
     widget_add_text_box_element(
-        widget, 0, 0, 128, 64, AlignCenter, AlignTop, "\e#Unpair the Device?\e#\n", false);
+        widget, 0, 0, 128, 64, AlignCenter, AlignTop, "\e#Удалить сопряжение?\e#\n", false);
 
     view_dispatcher_switch_to_view(bad_usb->view_dispatcher, BadUsbAppViewWidget);
 }
@@ -36,8 +36,7 @@ bool bad_usb_scene_confirm_unpair_on_event(void* context, SceneManagerEvent even
     if(event.type == SceneManagerEventTypeCustom) {
         consumed = true;
         if(event.event == GuiButtonTypeRight) {
-            bad_usb_hid_ble_remove_pairing();
-            scene_manager_next_scene(scene_manager, BadUsbSceneDone);
+            scene_manager_next_scene(scene_manager, BadUsbSceneUnpairDone);
         } else if(event.event == GuiButtonTypeLeft) {
             scene_manager_previous_scene(scene_manager);
         }

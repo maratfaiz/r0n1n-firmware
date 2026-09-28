@@ -1,5 +1,5 @@
-# Builds firmware/ (the Unleashed base merged in via git subtree, see
-# docs/FIRMWARE_LANDSCAPE.md) on every push and PR, so a broken build is
+# Builds firmware/ (the official Flipper Zero firmware merged in via git
+# subtree, see docs/FIRMWARE_LANDSCAPE.md) on every push and PR, so a broken build is
 # caught before it lands. Deliberately minimal for Stage 0: default debug
 # build only, no release/COMPACT flavor and no PR-comment bot yet (see
 # docs/ROADMAP.md).

@@ -24,10 +24,10 @@ void nfc_render_mf_desfire_info(
             }
         }
 
-        furi_string_cat_printf(str, "\n%lu Application%s", app_count, app_count != 1 ? "s" : "");
-        furi_string_cat_printf(str, ", %lu File%s", file_count, file_count != 1 ? "s" : "");
+        furi_string_cat_printf(str, "\nПриложений: %lu", app_count);
+        furi_string_cat_printf(str, ", файлов: %lu", file_count);
     } else {
-        furi_string_cat_printf(str, "\nAuth required to read apps!");
+        furi_string_cat_printf(str, "\nНужна авторизация!");
     }
 
     furi_string_cat_printf(str, "\n%lu", bytes_total);
@@ -35,11 +35,11 @@ void nfc_render_mf_desfire_info(
     if(data->version.sw_storage & 1) {
         furi_string_push_back(str, '+');
     }
-    furi_string_cat_printf(str, " bytes, %lu bytes free", bytes_free);
+    furi_string_cat_printf(str, " байт, свободно %lu байт", bytes_free);
 
     if(format_type != NfcProtocolFormatTypeFull) return;
 
-    furi_string_cat(str, "\n\e#ISO14443-4 data");
+    furi_string_cat(str, "\n\e#Данные ISO14443-4");
     nfc_render_iso14443_4a_extra(mf_desfire_get_base_data(data), str);
 }
 
@@ -142,7 +142,7 @@ void nfc_render_mf_desfire_key_version(
 
 void nfc_render_mf_desfire_application_id(const MfDesfireApplicationId* data, FuriString* str) {
     const uint8_t* app_id = data->data;
-    furi_string_cat_printf(str, "Application %02x%02x%02x\n", app_id[2], app_id[1], app_id[0]);
+    furi_string_cat_printf(str, "Приложение %02x%02x%02x\n", app_id[2], app_id[1], app_id[0]);
 }
 
 void nfc_render_mf_desfire_application(const MfDesfireApplication* data, FuriString* str) {
@@ -156,7 +156,7 @@ void nfc_render_mf_desfire_application(const MfDesfireApplication* data, FuriStr
 }
 
 void nfc_render_mf_desfire_file_id(const MfDesfireFileId* data, FuriString* str) {
-    furi_string_cat_printf(str, "File %d\n", *data);
+    furi_string_cat_printf(str, "Файл %d\n", *data);
 }
 
 void nfc_render_mf_desfire_file_settings_data(
@@ -184,7 +184,7 @@ void nfc_render_mf_desfire_file_settings_data(
         type = "txn-mac";
         break;
     default:
-        type = "unknown";
+        type = "неизвестно";
     }
 
     const char* comm;
@@ -199,7 +199,7 @@ void nfc_render_mf_desfire_file_settings_data(
         comm = "enciphered";
         break;
     default:
-        comm = "unknown";
+        comm = "неизвестно";
     }
 
     furi_string_cat_printf(str, "%s %s\n", type, comm);
@@ -261,7 +261,7 @@ void nfc_render_mf_desfire_file_settings_data(
         }
     }
     if(is_auth_required) {
-        furi_string_cat_printf(str, "Auth required to read file data\n");
+        furi_string_cat_printf(str, "Нужна авторизация для файла\n");
         return;
     }
 

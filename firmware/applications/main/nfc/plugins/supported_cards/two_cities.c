@@ -1,11 +1,10 @@
 #include "nfc_supported_card_plugin.h"
+
 #include <flipper_application/flipper_application.h>
 
+#include <nfc/nfc_device.h>
+#include <bit_lib/bit_lib.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
-
-#include <bit_lib.h>
-
-#include "mf_classic_parser_util.h"
 
 #define TAG "TwoCities"
 
@@ -41,7 +40,7 @@ bool two_cities_verify(Nfc* nfc) {
     bool verified = false;
 
     do {
-        const uint8_t verify_sector = 9;
+        const uint8_t verify_sector = 4;
         uint8_t block_num = mf_classic_get_first_block_num_of_sector(verify_sector);
         FURI_LOG_D(TAG, "Verifying sector %u", verify_sector);
 
@@ -95,10 +94,7 @@ static bool two_cities_read(Nfc* nfc, NfcDevice* device) {
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        // Accept a partial read only if the data sector the parser needs was actually read;
-        // otherwise report "not handled" so the app runs the nested/dict-attack tail for the rest.
-        is_read = (error == MfClassicErrorNone) ||
-                  (error == MfClassicErrorPartialRead && mf_classic_is_sector_read(data, 4));
+        is_read = (error == MfClassicErrorNone);
     } while(false);
 
     mf_classic_free(data);
@@ -117,23 +113,32 @@ static bool two_cities_parse(const NfcDevice* device, FuriString* parsed_data) {
         // Verify key
         MfClassicSectorTrailer* sec_tr = mf_classic_get_sector_trailer_by_sector(data, 4);
         uint64_t key = bit_lib_bytes_to_num_be(sec_tr->key_a.data, 6);
-        if(key != two_cities_4k_keys[4].a) break;
+        if(key != two_cities_4k_keys[4].a) return false;
 
         // =====
         // PLANTAIN
         // =====
 
-        // the Plantain balance is little-endian kopeks at the start of block 16
-        const uint32_t balance = bit_lib_bytes_to_num_le(data->block[16].data, 4) / 100;
-
-        // the card number is the UID, so it survives an unread manufacturer block. a card
-        // with a shorter UID is not one we can number, but its purses still read fine
-        size_t uid_len = 0;
-        const uint8_t* uid = mf_classic_get_uid(data, &uid_len);
-        const bool uid_is_card_number = (uid_len == 7);
-        const uint64_t card_number = uid_is_card_number ? bit_lib_bytes_to_num_le(uid, uid_len) :
-                                                          0;
-        if(!uid_is_card_number) FURI_LOG_D(TAG, "UID is %u bytes, expected 7", uid_len);
+        // Point to block 0 of sector 4, value 0
+        const uint8_t* temp_ptr = data->block[16].data;
+        // Read first 4 bytes of block 0 of sector 4 from last to first and convert them to uint32_t
+        // 38 18 00 00 becomes 00 00 18 38, and equals to 6200 decimal
+        uint32_t balance =
+            ((temp_ptr[3] << 24) | (temp_ptr[2] << 16) | (temp_ptr[1] << 8) | temp_ptr[0]) / 100;
+        // Read card number
+        // Point to block 0 of sector 0, value 0
+        temp_ptr = data->block[0].data;
+        // Read first 7 bytes of block 0 of sector 0 from last to first and convert them to uint64_t
+        // 04 31 16 8A 23 5C 80 becomes 80 5C 23 8A 16 31 04, and equals to 36130104729284868 decimal
+        uint8_t card_number_arr[7];
+        for(size_t i = 0; i < 7; i++) {
+            card_number_arr[i] = temp_ptr[6 - i];
+        }
+        // Copy card number to uint64_t
+        uint64_t card_number = 0;
+        for(size_t i = 0; i < 7; i++) {
+            card_number = (card_number << 8) | card_number_arr[i];
+        }
 
         // =====
         // --PLANTAIN--
@@ -151,30 +156,13 @@ static bool two_cities_parse(const NfcDevice* device, FuriString* parsed_data) {
         }
         troika_number >>= 4;
 
-        furi_string_printf(parsed_data, "\e#Troika+Plantain\n");
-        if(uid_is_card_number) {
-            furi_string_cat_printf(parsed_data, "PN: %lluX\n", card_number);
-        } else {
-            furi_string_cat(parsed_data, "PN: Unknown\n");
-        }
-        // block 16 is in the sector verified above, but a known key does not mean it was read
-        if(mf_classic_parser_block_has_data(data, 16)) {
-            furi_string_cat_printf(parsed_data, "PB: %lu rur.\n", balance);
-        } else {
-            furi_string_cat(parsed_data, "PB: Unknown\n");
-        }
-        // the Troika half is in sector 8, which is never verified here, and its number and
-        // balance sit in different blocks that can go missing on their own
-        if(mf_classic_parser_block_has_data(data, 32)) {
-            furi_string_cat_printf(parsed_data, "TN: %lu\n", troika_number);
-        } else {
-            furi_string_cat(parsed_data, "TN: Unknown\n");
-        }
-        if(mf_classic_parser_block_has_data(data, 33)) {
-            furi_string_cat_printf(parsed_data, "TB: %u rur.\n", troika_balance);
-        } else {
-            furi_string_cat(parsed_data, "TB: Unknown\n");
-        }
+        furi_string_printf(
+            parsed_data,
+            "\e#Тройка+Подорожник\nPN: %lluX\nPB: %lu руб.\nTN: %lu\nTB: %u руб.\n",
+            card_number,
+            balance,
+            troika_number,
+            troika_balance);
 
         parsed = true;
     } while(false);

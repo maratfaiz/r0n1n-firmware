@@ -33,16 +33,10 @@ class ApplicationsCGenerator:
         ),
     }
 
-    EXTERNAL_TYPE_MAP = {
-        FlipperAppType.MENUEXTERNAL: (
-            "FlipperExternalApplication",
-            "FLIPPER_EXTERNAL_APPS",
-        ),
-        FlipperAppType.EXTSETTINGS: (
-            "FlipperExternalApplication",
-            "FLIPPER_EXTSETTINGS_APPS",
-        ),
-    }
+    APP_EXTERNAL_TYPE = (
+        "FlipperExternalApplication",
+        "FLIPPER_EXTERNAL_APPS",
+    )
 
     def __init__(self, buildset: AppBuildset, autorun_app: str = ""):
         self.buildset = buildset
@@ -106,15 +100,12 @@ class ApplicationsCGenerator:
                 ]
             )
 
-        for apptype in self.EXTERNAL_TYPE_MAP:
-            entry_type, entry_block = self.EXTERNAL_TYPE_MAP[apptype]
-            external_apps = self.buildset.get_apps_of_type(apptype)
-            contents.append(f"const {entry_type} {entry_block}[] = {{")
-            contents.append(",\n".join(map(self.get_external_app_descr, external_apps)))
-            contents.append("};")
-            contents.append(
-                f"const size_t {entry_block}_COUNT = COUNT_OF({entry_block});"
-            )
+        entry_type, entry_block = self.APP_EXTERNAL_TYPE
+        external_apps = self.buildset.get_apps_of_type(FlipperAppType.MENUEXTERNAL)
+        contents.append(f"const {entry_type} {entry_block}[] = {{")
+        contents.append(",\n".join(map(self.get_external_app_descr, external_apps)))
+        contents.append("};")
+        contents.append(f"const size_t {entry_block}_COUNT = COUNT_OF({entry_block});")
 
         return "\n".join(contents)
 

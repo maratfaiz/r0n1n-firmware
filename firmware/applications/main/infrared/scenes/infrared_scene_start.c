@@ -5,7 +5,6 @@ enum SubmenuIndex {
     SubmenuIndexLearnNewRemote,
     SubmenuIndexSavedRemotes,
     SubmenuIndexGpioSettings,
-    SubmenuIndexLearnNewRemoteRaw,
     SubmenuIndexDebug
 };
 
@@ -21,42 +20,32 @@ void infrared_scene_start_on_enter(void* context) {
 
     submenu_add_item(
         submenu,
-        "Universal Remotes",
+        "Универсальные пульты",
         SubmenuIndexUniversalRemotes,
         infrared_scene_start_submenu_callback,
         infrared);
     submenu_add_item(
         submenu,
-        "Learn New Remote",
+        "Записать новый пульт",
         SubmenuIndexLearnNewRemote,
         infrared_scene_start_submenu_callback,
         infrared);
     submenu_add_item(
         submenu,
-        "Saved Remotes",
+        "Сохраненные пульты",
         SubmenuIndexSavedRemotes,
         infrared_scene_start_submenu_callback,
         infrared);
     submenu_add_item(
         submenu,
-        "GPIO Settings",
+        "Настройки GPIO",
         SubmenuIndexGpioSettings,
         infrared_scene_start_submenu_callback,
         infrared);
 
     if(infrared->app_state.is_debug_enabled) {
         submenu_add_item(
-            submenu,
-            "Learn New Remote RAW",
-            SubmenuIndexLearnNewRemoteRaw,
-            infrared_scene_start_submenu_callback,
-            infrared);
-        submenu_add_item(
-            submenu,
-            "Debug RX",
-            SubmenuIndexDebug,
-            infrared_scene_start_submenu_callback,
-            infrared);
+            submenu, "Отладка", SubmenuIndexDebug, infrared_scene_start_submenu_callback, infrared);
     }
 
     const uint32_t submenu_index =
@@ -78,14 +67,7 @@ bool infrared_scene_start_on_event(void* context, SceneManagerEvent event) {
         scene_manager_set_scene_state(scene_manager, InfraredSceneStart, submenu_index);
         if(submenu_index == SubmenuIndexUniversalRemotes) {
             scene_manager_next_scene(scene_manager, InfraredSceneUniversal);
-        } else if(
-            submenu_index == SubmenuIndexLearnNewRemote ||
-            submenu_index == SubmenuIndexLearnNewRemoteRaw) {
-            // enable automatic signal decoding if "Learn New Remote"
-            // disable automatic signal decoding if "Learn New Remote (RAW)"
-            infrared_worker_rx_enable_signal_decoding(
-                infrared->worker, submenu_index == SubmenuIndexLearnNewRemote);
-
+        } else if(submenu_index == SubmenuIndexLearnNewRemote) {
             infrared->app_state.is_learning_new_remote = true;
             scene_manager_next_scene(scene_manager, InfraredSceneLearn);
         } else if(submenu_index == SubmenuIndexSavedRemotes) {

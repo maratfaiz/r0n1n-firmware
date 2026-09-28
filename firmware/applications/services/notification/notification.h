@@ -65,7 +65,6 @@ typedef enum {
     NotificationMessageTypeDelay,
 
     NotificationMessageTypeLedDisplayBacklight,
-    NotificationMessageTypeLedDisplayBacklightForceOn,
     NotificationMessageTypeLedDisplayBacklightEnforceOn,
     NotificationMessageTypeLedDisplayBacklightEnforceAuto,
 

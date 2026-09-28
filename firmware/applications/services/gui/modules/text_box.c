@@ -1,6 +1,7 @@
 #include "text_box.h"
 #include <gui/canvas.h>
 #include <gui/elements.h>
+#include <gui/utf8_i.h>
 #include <furi.h>
 #include <stdint.h>
 
@@ -118,12 +119,14 @@ static void text_box_seek_next_line(Canvas* canvas, TextBoxModel* model) {
             model->text_offset++;
             break;
         } else {
-            size_t glyph_width = canvas_glyph_width(canvas, symb);
+            uint16_t code;
+            size_t len = gui_utf8_char(&model->text[model->text_offset], &code);
+            size_t glyph_width = canvas_glyph_width(canvas, code);
             if(line_width + glyph_width > TEXT_BOX_TEXT_WIDTH) {
                 break;
             }
             line_width += glyph_width;
-            model->text_offset++;
+            model->text_offset += len;
         }
     }
 }

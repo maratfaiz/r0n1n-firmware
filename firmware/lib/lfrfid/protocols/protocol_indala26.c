@@ -290,16 +290,16 @@ void protocol_indala26_render_data_internal(
         furi_string_printf(
             result,
             "FC: %u\n"
-            "Card: %u",
+            "Карта: %u",
             fc,
             card);
     } else {
         furi_string_printf(
             result,
             "FC: %u\n"
-            "Card: %u\n"
-            "Parity: %c\n"
-            "Checksum: %c",
+            "Карта: %u\n"
+            "Четность: %c\n"
+            "Контр. сумма: %c",
             fc,
             card,
             (wiegand_correct ? '+' : '-'),

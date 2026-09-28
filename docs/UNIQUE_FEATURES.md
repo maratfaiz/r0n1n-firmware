@@ -76,7 +76,7 @@ first-class feature. Fully native, no companion or external hardware
 required, so it belongs in the same early-priority bucket as items 1 and 8
 below. The font risk this raised is resolved and cheap (see
 `HARDWARE.md`): the vendored `u8g2` library already ships Cyrillic
-variants of Flipper's own fonts, at a cost of a few KB against a ~140 KB
+variants of Flipper's own fonts, at a cost of a few KB against a ~245 KB
 free-flash budget — confirmed with a real build, not estimated. What's
 left is a software/UX problem — the string-table service itself
 (`ARCHITECTURE.md`) and picking Cyrillic font substitutes for the two

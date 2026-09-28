@@ -12,6 +12,15 @@
 #define INFRARED_TX_MIN_INTERVAL_MS (50U)
 #define INFRARED_TASK_STACK_SIZE    (2048UL)
 
+#define INFRARED_SETTINGS_PATH    INT_PATH(".infrared.settings")
+#define INFRARED_SETTINGS_VERSION (1)
+#define INFRARED_SETTINGS_MAGIC   (0x1F)
+
+typedef struct {
+    FuriHalInfraredTxPin tx_pin;
+    bool otg_enabled;
+} InfraredSettings;
+
 static const NotificationSequence*
     infrared_notification_sequences[InfraredNotificationMessageCount] = {
         &sequence_success,
@@ -26,7 +35,7 @@ static const NotificationSequence*
 
 static void infrared_make_app_folder(InfraredApp* infrared) {
     if(!storage_simply_mkdir(infrared->storage, INFRARED_APP_FOLDER)) {
-        infrared_show_error_message(infrared, "Cannot create\napp folder");
+        infrared_show_error_message(infrared, "Не удалось создать\nпапку");
     }
 }
 
@@ -100,7 +109,7 @@ static void infrared_rpc_command_callback(const RpcAppSystemEvent* event, void* 
     }
 }
 
-void infrared_find_vacant_remote_name(FuriString* name, const char* path) {
+static void infrared_find_vacant_remote_name(FuriString* name, const char* path) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
 
     FuriString* base_path;
@@ -301,14 +310,13 @@ static void infrared_free(InfraredApp* infrared) {
     free(infrared);
 }
 
-InfraredErrorCode infrared_add_named_remote_with_button(
+InfraredErrorCode infrared_add_remote_with_button(
     const InfraredApp* infrared,
-    const char* remote_name,
     const char* button_name,
     const InfraredSignal* signal) {
     InfraredRemote* remote = infrared->remote;
 
-    FuriString* new_name = furi_string_alloc_set(remote_name);
+    FuriString* new_name = furi_string_alloc_set(INFRARED_DEFAULT_REMOTE_NAME);
     FuriString* new_path = furi_string_alloc_set(INFRARED_APP_FOLDER);
 
     infrared_find_vacant_remote_name(new_name, furi_string_get_cstr(new_path));
@@ -328,14 +336,6 @@ InfraredErrorCode infrared_add_named_remote_with_button(
     furi_string_free(new_path);
 
     return error;
-}
-
-InfraredErrorCode infrared_add_remote_with_button(
-    const InfraredApp* infrared,
-    const char* button_name,
-    const InfraredSignal* signal) {
-    return infrared_add_named_remote_with_button(
-        infrared, INFRARED_DEFAULT_REMOTE_NAME, button_name, signal);
 }
 
 InfraredErrorCode
@@ -589,8 +589,10 @@ int32_t infrared_app(void* p) {
 
     bool is_remote_loaded = false;
     bool is_rpc_mode = false;
+    // R0N1N simple mode opens the universal TV remote directly
+    bool open_universal_tv = p && !strcmp(p, INFRARED_ARG_UNIVERSAL_TV);
 
-    if(p && strlen(p)) {
+    if(p && strlen(p) && !open_universal_tv) {
         uint32_t rpc_ctx = 0;
         if(sscanf(p, "RPC %lX", &rpc_ctx) == 1) {
             infrared->rpc_ctx = (void*)rpc_ctx;
@@ -608,8 +610,8 @@ int32_t infrared_app(void* p) {
                 is_remote_loaded = false;
                 bool wrong_file_type = INFRARED_ERROR_CHECK(error, InfraredErrorCodeWrongFileType);
                 const char* format = wrong_file_type ?
-                                         "Library file\n\"%s\" can't be openned as a remote" :
-                                         "Failed to load\n\"%s\"";
+                                         "Файл библиотеки\n\"%s\" нельзя открыть\nкак пульт" :
+                                         "Не удалось\nзагрузить\n\"%s\"";
 
                 infrared_show_error_message(infrared, format, file_path);
                 return -1;
@@ -628,6 +630,8 @@ int32_t infrared_app(void* p) {
             infrared->view_dispatcher, infrared->gui, ViewDispatcherTypeFullscreen);
         if(is_remote_loaded) { //-V547
             scene_manager_next_scene(infrared->scene_manager, InfraredSceneRemote);
+        } else if(open_universal_tv) {
+            scene_manager_next_scene(infrared->scene_manager, InfraredSceneUniversalTV);
         } else {
             scene_manager_next_scene(infrared->scene_manager, InfraredSceneStart);
         }

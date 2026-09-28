@@ -60,7 +60,7 @@ bool mf_desfire_version_parse(MfDesfireVersion* data, const BitBuffer* buf) {
         bit_buffer_write_bytes(buf, data, sizeof(MfDesfireVersion));
     }
 
-    return can_parse && (data->hw_type & 0x0F) == 0x01;
+    return can_parse;
 }
 
 bool mf_desfire_free_memory_parse(MfDesfireFreeMemory* data, const BitBuffer* buf) {
@@ -81,17 +81,17 @@ bool mf_desfire_free_memory_parse(MfDesfireFreeMemory* data, const BitBuffer* bu
     return can_parse;
 }
 
-typedef struct FURI_PACKED {
-    bool is_master_key_changeable : 1;
-    bool is_free_directory_list   : 1;
-    bool is_free_create_delete    : 1;
-    bool is_config_changeable     : 1;
-    uint8_t change_key_id         : 4;
-    uint8_t max_keys              : 4;
-    uint8_t flags                 : 4;
-} MfDesfireKeySettingsLayout;
-
 bool mf_desfire_key_settings_parse(MfDesfireKeySettings* data, const BitBuffer* buf) {
+    typedef struct FURI_PACKED {
+        bool is_master_key_changeable : 1;
+        bool is_free_directory_list   : 1;
+        bool is_free_create_delete    : 1;
+        bool is_config_changeable     : 1;
+        uint8_t change_key_id         : 4;
+        uint8_t max_keys              : 4;
+        uint8_t flags                 : 4;
+    } MfDesfireKeySettingsLayout;
+
     const bool can_parse = bit_buffer_get_size_bytes(buf) == sizeof(MfDesfireKeySettingsLayout);
 
     if(can_parse) {
@@ -109,21 +109,6 @@ bool mf_desfire_key_settings_parse(MfDesfireKeySettings* data, const BitBuffer* 
     }
 
     return can_parse;
-}
-
-void mf_desfire_key_settings_dump(const MfDesfireKeySettings* data, BitBuffer* buf) {
-    MfDesfireKeySettingsLayout layout;
-
-    layout.is_master_key_changeable = data->is_master_key_changeable;
-    layout.is_free_directory_list = data->is_free_directory_list;
-    layout.is_free_create_delete = data->is_free_create_delete;
-    layout.is_config_changeable = data->is_config_changeable;
-
-    layout.change_key_id = data->change_key_id;
-    layout.max_keys = data->max_keys;
-    layout.flags = data->flags;
-
-    bit_buffer_append_bytes(buf, (uint8_t*)&layout, sizeof(MfDesfireKeySettingsLayout));
 }
 
 bool mf_desfire_key_version_parse(MfDesfireKeyVersion* data, const BitBuffer* buf) {
@@ -290,7 +275,9 @@ bool mf_desfire_file_settings_parse(MfDesfireFileSettings* data, const BitBuffer
                 printf("\r\n");
                 break;
             }
-            if(additional_access_rights_len > MF_DESFIRE_MAX_KEYS - 1) break;
+            if(additional_access_rights_len >
+               MF_DESFIRE_MAX_KEYS * sizeof(MfDesfireFileAccessRights))
+                break;
 
             memcpy(
                 &file_settings_temp.access_rights[1],
@@ -352,47 +339,6 @@ void mf_desfire_application_copy(MfDesfireApplication* data, const MfDesfireAppl
     simple_array_copy(data->file_ids, other->file_ids);
     simple_array_copy(data->file_settings, other->file_settings);
     simple_array_copy(data->file_data, other->file_data);
-}
-
-// These element types own nested arrays, so a bytewise compare would only compare their pointers
-static bool
-    mf_desfire_file_data_array_is_equal(const SimpleArray* instance, const SimpleArray* other) {
-    const uint32_t count = simple_array_get_count(instance);
-    if(count != simple_array_get_count(other)) return false;
-
-    for(uint32_t i = 0; i < count; i++) {
-        const MfDesfireFileData* data = simple_array_cget(instance, i);
-        const MfDesfireFileData* other_data = simple_array_cget(other, i);
-        if(!simple_array_is_equal(data->data, other_data->data)) return false;
-    }
-
-    return true;
-}
-
-static bool mf_desfire_application_is_equal(
-    const MfDesfireApplication* data,
-    const MfDesfireApplication* other) {
-    return memcmp(&data->key_settings, &other->key_settings, sizeof(MfDesfireKeySettings)) == 0 &&
-           simple_array_is_equal(data->key_versions, other->key_versions) &&
-           simple_array_is_equal(data->file_ids, other->file_ids) &&
-           simple_array_is_equal(data->file_settings, other->file_settings) &&
-           mf_desfire_file_data_array_is_equal(data->file_data, other->file_data);
-}
-
-bool mf_desfire_application_array_is_equal(const SimpleArray* instance, const SimpleArray* other) {
-    furi_check(instance);
-    furi_check(other);
-
-    const uint32_t count = simple_array_get_count(instance);
-    if(count != simple_array_get_count(other)) return false;
-
-    for(uint32_t i = 0; i < count; i++) {
-        if(!mf_desfire_application_is_equal(
-               simple_array_cget(instance, i), simple_array_cget(other, i)))
-            return false;
-    }
-
-    return true;
 }
 
 bool mf_desfire_version_load(MfDesfireVersion* data, FlipperFormat* ff) {
@@ -941,7 +887,7 @@ const SimpleArrayConfig mf_desfire_file_data_array_config = {
     .init = (SimpleArrayInit)mf_desfire_file_data_init,
     .copy = (SimpleArrayCopy)mf_desfire_file_data_copy,
     .reset = (SimpleArrayReset)mf_desfire_file_data_reset,
-    .type_size = sizeof(MfDesfireFileData),
+    .type_size = sizeof(MfDesfireData),
 };
 
 const SimpleArrayConfig mf_desfire_application_array_config = {

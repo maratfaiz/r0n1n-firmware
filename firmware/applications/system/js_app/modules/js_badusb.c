@@ -182,8 +182,12 @@ static void js_badusb_setup(struct mjs* mjs) {
 
     badusb->usb_if_prev = furi_hal_usb_get_config();
 
-    furi_hal_usb_unlock();
-    furi_hal_usb_set_config(&usb_hid, badusb->hid_cfg);
+    if(!furi_hal_usb_set_config(&usb_hid, badusb->hid_cfg)) {
+        mjs_prepend_errorf(mjs, MJS_INTERNAL_ERROR, "USB is locked, close companion app first");
+        badusb->usb_if_prev = NULL;
+        mjs_return(mjs, MJS_UNDEFINED);
+        return;
+    }
 
     mjs_return(mjs, MJS_UNDEFINED);
 }

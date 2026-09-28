@@ -12,27 +12,17 @@ extern const SubGhzProtocolEncoder subghz_protocol_somfy_telis_encoder;
 extern const SubGhzProtocol subghz_protocol_somfy_telis;
 
 /**
- * Allocate SubGhzProtocolEncoderSomfyTelis.
- * @param environment Pointer to a SubGhzEnvironment instance
- * @return SubGhzProtocolEncoderSomfyTelis* pointer to a SubGhzProtocolEncoderSomfyTelis instance
- */
-void* subghz_protocol_encoder_somfy_telis_alloc(SubGhzEnvironment* environment);
-
-/**
- * Deserialize and generating an upload to send.
- * @param context Pointer to a SubGhzProtocolEncoderSomfyTelis instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @return true On success
- */
-SubGhzProtocolStatus
-    subghz_protocol_encoder_somfy_telis_deserialize(void* context, FlipperFormat* flipper_format);
-
-/**
  * Allocate SubGhzProtocolDecoderSomfyTelis.
  * @param environment Pointer to a SubGhzEnvironment instance
  * @return SubGhzProtocolDecoderSomfyTelis* pointer to a SubGhzProtocolDecoderSomfyTelis instance
  */
 void* subghz_protocol_decoder_somfy_telis_alloc(SubGhzEnvironment* environment);
+
+/**
+ * Free SubGhzProtocolDecoderSomfyTelis.
+ * @param context Pointer to a SubGhzProtocolDecoderSomfyTelis instance
+ */
+void subghz_protocol_decoder_somfy_telis_free(void* context);
 
 /**
  * Reset decoder SubGhzProtocolDecoderSomfyTelis.
@@ -47,6 +37,25 @@ void subghz_protocol_decoder_somfy_telis_reset(void* context);
  * @param duration Duration of this level in, us
  */
 void subghz_protocol_decoder_somfy_telis_feed(void* context, bool level, uint32_t duration);
+
+/**
+ * Getting the hash sum of the last randomly received parcel.
+ * @param context Pointer to a SubGhzProtocolDecoderSomfyTelis instance
+ * @return hash Hash sum
+ */
+uint8_t subghz_protocol_decoder_somfy_telis_get_hash_data(void* context);
+
+/**
+ * Serialize data SubGhzProtocolDecoderSomfyTelis.
+ * @param context Pointer to a SubGhzProtocolDecoderSomfyTelis instance
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param preset The modulation on which the signal was received, SubGhzRadioPreset
+ * @return status
+ */
+SubGhzProtocolStatus subghz_protocol_decoder_somfy_telis_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset);
 
 /**
  * Deserialize data SubGhzProtocolDecoderSomfyTelis.

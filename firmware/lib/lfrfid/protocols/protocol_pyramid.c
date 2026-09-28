@@ -124,10 +124,10 @@ bool protocol_pyramid_decoder_feed(ProtocolPyramid* protocol, bool level, uint32
     return result;
 }
 
-bool protocol_pyramid_get_parity(const uint8_t* bits, size_t position, uint8_t type, int length) {
+bool protocol_pyramid_get_parity(const uint8_t* bits, uint8_t type, int length) {
     int x;
     for(x = 0; length > 0; --length)
-        x += bit_lib_get_bit(bits, position + length - 1);
+        x += bit_lib_get_bit(bits, length - 1);
     x %= 2;
     return x ^ type;
 }
@@ -138,12 +138,12 @@ void protocol_pyramid_add_wiegand_parity(
     uint8_t* source,
     uint8_t length) {
     bit_lib_set_bit(
-        target, target_position, protocol_pyramid_get_parity(source, 0, 0 /* even */, length / 2));
+        target, target_position, protocol_pyramid_get_parity(source, 0 /* even */, length / 2));
     bit_lib_copy_bits(target, target_position + 1, length, source, 0);
     bit_lib_set_bit(
         target,
         target_position + length + 1,
-        protocol_pyramid_get_parity(source, length / 2, 1 /* odd */, length / 2));
+        protocol_pyramid_get_parity(source + length / 2, 1 /* odd */, length / 2));
 }
 
 static void protocol_pyramid_encode(ProtocolPyramid* protocol) {
@@ -244,7 +244,7 @@ void protocol_pyramid_render_data(ProtocolPyramid* protocol, FuriString* result)
     uint8_t* decoded_data = protocol->data;
     uint8_t format_length = decoded_data[0];
 
-    furi_string_printf(result, "Format: %hhu\n", format_length);
+    furi_string_printf(result, "Формат: %hhu\n", format_length);
     if(format_length == 26) {
         uint8_t facility;
         bit_lib_copy_bits(&facility, 0, 8, decoded_data, 8);
@@ -252,9 +252,9 @@ void protocol_pyramid_render_data(ProtocolPyramid* protocol, FuriString* result)
         uint16_t card_id;
         bit_lib_copy_bits((uint8_t*)&card_id, 8, 8, decoded_data, 16);
         bit_lib_copy_bits((uint8_t*)&card_id, 0, 8, decoded_data, 24);
-        furi_string_cat_printf(result, "FC: %03hhu; Card: %05hu", facility, card_id);
+        furi_string_cat_printf(result, "FC: %03hhu; Карта: %05hu", facility, card_id);
     } else {
-        furi_string_cat_printf(result, "Data: Unknown");
+        furi_string_cat_printf(result, "Данные: неизвестно");
     }
 }
 

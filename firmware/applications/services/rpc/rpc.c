@@ -63,14 +63,6 @@ static RpcSystemCallbacks rpc_systems[] = {
         .alloc = rpc_desktop_alloc,
         .free = rpc_desktop_free,
     },
-    {
-        .alloc = rpc_gps_alloc,
-        .free = rpc_gps_free,
-    },
-    {
-        .alloc = rpc_network_alloc,
-        .free = rpc_network_free,
-    },
 };
 
 struct RpcSession {
@@ -165,8 +157,8 @@ void rpc_session_set_terminated_callback(
 
 /* Doesn't forbid using rpc_feed_bytes() after session close - it's safe.
  * Because any bytes received in buffer will be flushed before next session.
- * If bytes get into stream buffer before it's get emptied and this
- * command is gets processed - it's safe either way. But case of it is quite
+ * If bytes get into stream buffer before it's get epmtified and this
+ * command is gets processed - it's safe either. But case of it is quite
  * odd: client sends close request and sends command after.
  */
 size_t rpc_session_feed(

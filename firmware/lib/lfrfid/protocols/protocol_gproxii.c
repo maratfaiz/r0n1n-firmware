@@ -244,7 +244,7 @@ void protocol_gproxii_render_data(ProtocolGProxII* protocol, FuriString* result)
         // Print FC, Card and Length
         furi_string_cat_printf(
             result,
-            "FC: %u Card: %u LEN: %hhu\n",
+            "FC: %u Карта: %u Длина: %hhu\n",
             bit_lib_get_bits(protocol->decoded_data, 33, 8),
             bit_lib_get_bits_16(protocol->decoded_data, 41, 16),
             card_len);
@@ -259,7 +259,7 @@ void protocol_gproxii_render_data(ProtocolGProxII* protocol, FuriString* result)
         // Print FC, Card and Length
         furi_string_cat_printf(
             result,
-            "FC: %u Card: %u LEN: %hhu\n",
+            "FC: %u Карта: %u Длина: %hhu\n",
             bit_lib_get_bits_16(protocol->decoded_data, 33, 14),
             bit_lib_get_bits_16(protocol->decoded_data, 51, 16),
             card_len);
@@ -271,7 +271,7 @@ void protocol_gproxii_render_data(ProtocolGProxII* protocol, FuriString* result)
             crc_code,
             bit_lib_get_bits_16(protocol->decoded_data, 16, 16));
     } else {
-        furi_string_cat_printf(result, "Read Error\n");
+        furi_string_cat_printf(result, "Ошибка чтения\n");
     }
 }
 
@@ -286,20 +286,6 @@ bool protocol_gproxii_write_data(ProtocolGProxII* protocol, void* data) {
         request->t5577.block[2] = bit_lib_get_bits_32(protocol->data, 32, 32);
         request->t5577.block[3] = bit_lib_get_bits_32(protocol->data, 64, 32);
         request->t5577.blocks_to_write = 4;
-        result = true;
-    } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-        request->em4305.word[4] =
-            (EM4x05_MODULATION_BIPHASE | EM4x05_SET_BITRATE(64) | (7 << EM4x05_MAXBLOCK_SHIFT));
-        uint32_t encoded_data_reversed[3] = {0};
-        for(uint8_t i = 0; i < 96; i++) {
-            encoded_data_reversed[i / 32] = (encoded_data_reversed[i / 32] << 1) |
-                                            (bit_lib_get_bit(protocol->data, (95 - i)) & 1);
-            encoded_data_reversed[i / 32] ^= 1; // Invert to make DIPHASE/BIPHASE.
-        }
-        request->em4305.word[5] = encoded_data_reversed[2];
-        request->em4305.word[6] = encoded_data_reversed[1];
-        request->em4305.word[7] = encoded_data_reversed[0];
-        request->em4305.mask = 0xF0;
         result = true;
     }
     return result;

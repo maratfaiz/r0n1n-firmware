@@ -15,15 +15,15 @@ void storage_settings_scene_format_confirm_on_enter(void* context) {
 
     if(sd_status == FSE_NOT_READY) {
         dialog_ex_set_icon(dialog_ex, 83, 22, &I_WarningDolphinFlip_45x42);
-        dialog_ex_set_header(dialog_ex, "SD Card Not Mounted", 64, 3, AlignCenter, AlignTop);
+        dialog_ex_set_header(dialog_ex, "Нет SD-карты", 64, 3, AlignCenter, AlignTop);
         dialog_ex_set_text(
-            dialog_ex, "Try to reinsert\nor format SD\ncard.", 3, 19, AlignLeft, AlignTop);
-        dialog_ex_set_center_button_text(dialog_ex, "Ok");
+            dialog_ex, "Вставьте заново\nили отформатируйте\nкарту.", 3, 19, AlignLeft, AlignTop);
+        dialog_ex_set_center_button_text(dialog_ex, "OK");
     } else {
-        dialog_ex_set_header(dialog_ex, "Format SD Card?", 64, 0, AlignCenter, AlignTop);
-        dialog_ex_set_text(dialog_ex, "All data will be lost!", 64, 12, AlignCenter, AlignTop);
-        dialog_ex_set_left_button_text(dialog_ex, "Cancel");
-        dialog_ex_set_right_button_text(dialog_ex, "Format");
+        dialog_ex_set_header(dialog_ex, "Форматировать SD?", 64, 0, AlignCenter, AlignTop);
+        dialog_ex_set_text(dialog_ex, "Все данные удалятся!", 64, 12, AlignCenter, AlignTop);
+        dialog_ex_set_left_button_text(dialog_ex, "Отмена");
+        dialog_ex_set_right_button_text(dialog_ex, "Формат.");
     }
 
     dialog_ex_set_context(dialog_ex, app);
@@ -41,13 +41,7 @@ bool storage_settings_scene_format_confirm_on_event(void* context, SceneManagerE
         switch(event.event) {
         case DialogExResultLeft:
         case DialogExResultCenter:
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_previous_scene(app->scene_manager);
-            }
+            consumed = scene_manager_previous_scene(app->scene_manager);
             break;
         case DialogExResultRight:
             scene_manager_next_scene(app->scene_manager, StorageSettingsFormatting);

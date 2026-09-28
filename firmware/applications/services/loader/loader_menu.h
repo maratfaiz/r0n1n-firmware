@@ -1,6 +1,5 @@
 #pragma once
 #include <furi.h>
-#include <gui/modules/menu.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -8,11 +7,12 @@ extern "C" {
 
 typedef struct LoaderMenu LoaderMenu;
 
-LoaderMenu* loader_menu_alloc(void (*closed_cb)(void*), void* context, const MenuStyle* style);
+LoaderMenu* loader_menu_alloc(void (*closed_cb)(void*), void* context);
 
 void loader_menu_free(LoaderMenu* loader_menu);
 
-void loader_menu_set_style(LoaderMenu* loader_menu, const MenuStyle* style);
+/** R0N1N: the Russian name shown for app `name`, or `name` itself. */
+const char* loader_display_name(const char* name);
 
 #ifdef __cplusplus
 }

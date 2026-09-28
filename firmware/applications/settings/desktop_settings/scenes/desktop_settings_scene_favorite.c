@@ -1,5 +1,5 @@
 #include "../desktop_settings_app.h"
-#include <applications.h>
+#include "applications.h"
 #include "desktop_settings_scene.h"
 #include "desktop_settings_scene_i.h"
 #include <flipper_application/flipper_application.h>
@@ -8,18 +8,18 @@
 
 #define APPS_COUNT (FLIPPER_APPS_COUNT + FLIPPER_EXTERNAL_APPS_COUNT)
 
-#define DEFAULT_INDEX         (0)
-#define EXTERNAL_BROWSER_NAME ("Apps Menu (Default)")
-#define PASSPORT_NAME         ("Passport (Default)")
+#define DEFAULT_INDEX                  (0)
+#define EXTERNAL_BROWSER_NAME          ("(   ) Меню приложений")
+#define EXTERNAL_BROWSER_NAME_SELECTED ("(*) Меню приложений")
+#define PASSPORT_NAME                  ("(   ) Паспорт")
+#define PASSPORT_NAME_SELECTED         ("(*) Паспорт")
 
-#define NONE_APPLICATION_INDEX (1)
-#define NONE_APPLICATION_NAME  "None (disable)"
-#define LOCK_APPLICATION_NAME  "Lock Flipper"
+#define SELECTED_PREFIX     ("(*) ")
+#define NOT_SELECTED_PREFIX ("(   ) ")
 
-#define EXTERNAL_APPLICATION_INDEX (2)
-#define EXTERNAL_APPLICATION_NAME  ("[Select App]")
-
-#define MAIN_LIST_APPLICATION_OFFSET (3)
+#define EXTERNAL_APPLICATION_INDEX         (1)
+#define EXTERNAL_APPLICATION_NAME          ("(   ) [Выбрать]")
+#define EXTERNAL_APPLICATION_NAME_SELECTED ("(*) [Выбрать]")
 
 #define PRESELECTED_SPECIAL 0xffffffff
 
@@ -67,9 +67,7 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         scene_manager_get_scene_state(app->scene_manager, DesktopSettingsAppSceneFavorite);
     uint32_t pre_select_item = PRESELECTED_SPECIAL;
     FavoriteApp* curr_favorite_app = NULL;
-    bool is_dummy_app = false;
     bool default_passport = false;
-    bool lock_if_none = false;
 
     if((favorite_id & SCENE_STATE_SET_DUMMY_APP) == 0) {
         furi_assert(favorite_id < FavoriteAppNumber);
@@ -81,11 +79,8 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         favorite_id &= ~(SCENE_STATE_SET_DUMMY_APP); //-V784
         furi_assert(favorite_id < DummyAppNumber);
         curr_favorite_app = &app->settings.dummy_apps[favorite_id];
-        is_dummy_app = true;
         default_passport = true;
-        if(favorite_id == DummyAppUpLong) {
-            lock_if_none = true;
-        }
+        favorite_id |= SCENE_STATE_SET_DUMMY_APP;
     }
 
     // Special case: Application browser
@@ -93,14 +88,6 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         submenu,
         default_passport ? (PASSPORT_NAME) : (EXTERNAL_BROWSER_NAME),
         DEFAULT_INDEX,
-        desktop_settings_scene_favorite_submenu_callback,
-        app);
-
-    // Special case: None (disable) or Lock Flipper
-    submenu_add_item(
-        submenu,
-        lock_if_none ? (LOCK_APPLICATION_NAME) : (NONE_APPLICATION_NAME),
-        NONE_APPLICATION_INDEX,
         desktop_settings_scene_favorite_submenu_callback,
         app);
 
@@ -112,37 +99,72 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         desktop_settings_scene_favorite_submenu_callback,
         app);
 
-    if(!is_dummy_app) {
-        for(size_t i = 0; i < APPS_COUNT; i++) {
-            const char* name = favorite_fap_get_app_name(i);
+    FuriString* full_name = furi_string_alloc();
 
-            submenu_add_item(
-                submenu,
-                name,
-                i + MAIN_LIST_APPLICATION_OFFSET,
-                desktop_settings_scene_favorite_submenu_callback,
-                app);
+    for(size_t i = 0; i < APPS_COUNT; i++) {
+        const char* name = favorite_fap_get_app_name(i);
 
-            // Select favorite item in submenu
-            if(!strcmp(name, curr_favorite_app->name_or_path)) {
-                pre_select_item = i + MAIN_LIST_APPLICATION_OFFSET;
-            }
+        // Add the prefix
+        furi_string_reset(full_name);
+        if(!strcmp(name, curr_favorite_app->name_or_path)) {
+            furi_string_set_str(full_name, SELECTED_PREFIX);
+        } else {
+            furi_string_set_str(full_name, NOT_SELECTED_PREFIX);
+        }
+        furi_string_cat_str(full_name, name);
+
+        submenu_add_item(
+            submenu,
+            furi_string_get_cstr(full_name),
+            i + 2,
+            desktop_settings_scene_favorite_submenu_callback,
+            app);
+
+        // Select favorite item in submenu
+        if(!strcmp(name, curr_favorite_app->name_or_path)) {
+            pre_select_item = i + 2;
         }
     }
 
     if(pre_select_item == PRESELECTED_SPECIAL) {
         if(curr_favorite_app->name_or_path[0] == '\0') {
             pre_select_item = DEFAULT_INDEX;
-        } else if(
-            (curr_favorite_app->name_or_path[1] == '\0') &&
-            (curr_favorite_app->name_or_path[0] == '?')) {
-            pre_select_item = NONE_APPLICATION_INDEX;
+            submenu_change_item_label(
+                submenu,
+                DEFAULT_INDEX,
+                default_passport ? (PASSPORT_NAME_SELECTED) : (EXTERNAL_BROWSER_NAME_SELECTED));
         } else {
             pre_select_item = EXTERNAL_APPLICATION_INDEX;
+            submenu_change_item_label(
+                submenu, EXTERNAL_APPLICATION_INDEX, EXTERNAL_APPLICATION_NAME_SELECTED);
         }
     }
 
-    submenu_set_header(submenu, is_dummy_app ? ("Dummy Mode App") : ("Favorite App"));
+    switch(favorite_id) {
+    case SCENE_STATE_SET_FAVORITE_APP | FavoriteAppLeftShort:
+    case SCENE_STATE_SET_DUMMY_APP | DummyAppLeft:
+        submenu_set_header(submenu, "Влево - нажатие");
+        break;
+    case SCENE_STATE_SET_FAVORITE_APP | FavoriteAppLeftLong:
+        submenu_set_header(submenu, "Влево - удержание");
+        break;
+    case SCENE_STATE_SET_FAVORITE_APP | FavoriteAppRightShort:
+    case SCENE_STATE_SET_DUMMY_APP | DummyAppRight:
+        submenu_set_header(submenu, "Вправо - нажатие");
+        break;
+    case SCENE_STATE_SET_FAVORITE_APP | FavoriteAppRightLong:
+        submenu_set_header(submenu, "Вправо - удержание");
+        break;
+    case SCENE_STATE_SET_DUMMY_APP | DummyAppDown:
+        submenu_set_header(submenu, "Вниз - нажатие");
+        break;
+    case SCENE_STATE_SET_DUMMY_APP | DummyAppOk:
+        submenu_set_header(submenu, "Центр - нажатие");
+        break;
+    default:
+        break;
+    }
+
     submenu_set_selected_item(submenu, pre_select_item); // If set during loop, visual glitch.
 
     view_dispatcher_switch_to_view(app->view_dispatcher, DesktopSettingsAppViewMenu);
@@ -169,10 +191,6 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
         if(event.event == DEFAULT_INDEX) {
             curr_favorite_app->name_or_path[0] = '\0';
             consumed = true;
-        } else if(event.event == NONE_APPLICATION_INDEX) {
-            curr_favorite_app->name_or_path[0] = '?';
-            curr_favorite_app->name_or_path[1] = '\0';
-            consumed = true;
         } else if(event.event == EXTERNAL_APPLICATION_INDEX) {
             const DialogsFileBrowserOptions browser_options = {
                 .extension = ".fap",
@@ -198,7 +216,7 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
                 consumed = true;
             }
         } else {
-            size_t app_index = event.event - MAIN_LIST_APPLICATION_OFFSET;
+            size_t app_index = event.event - 2;
             const char* name = favorite_fap_get_app_name(app_index);
             if(name)
                 strlcpy(

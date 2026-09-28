@@ -3,15 +3,15 @@
 ## TL;DR
 
 R0N1N is not "yet another fork with a pile of apps" — it's a UX-first
-operating shell on top of the stable Unleashed base (with UX ideas ported
-from Momentum): a single Home dashboard (time/date/battery), "pseudo-swipe"
-navigation on the 5-button D-pad, a unified app catalog with
+operating shell on top of the official Flipper Zero firmware: a single
+Home dashboard (time/date/battery), "pseudo-swipe" navigation on the
+5-button D-pad, a unified app catalog with
 search/favorites/recent, and cross-cutting "mode profiles" (Everyday /
 Pentest / Dev / CTF) that reshape the menu around the task at hand.
 
-By 2026 the Flipper Zero fork market (OFW, Unleashed, Momentum,
-RogueMaster) has functionally converged — they differ in stability,
-polish, and the volume of bundled apps, not in raw capability (see
+By 2026 the Flipper Zero firmware market (the official firmware and the
+community custom firmwares) has functionally converged — they differ in
+stability, polish, and the volume of bundled apps, not in raw capability (see
 `FIRMWARE_LANDSCAPE.md`). The main unaddressed gap isn't features — it's
 **coherence and usability**. That's where R0N1N aims to compete.
 
@@ -36,7 +36,7 @@ polish, and the volume of bundled apps, not in raw capability (see
 
 ## Localization as a differentiator
 
-None of the existing forks (OFW, Unleashed, Momentum, RogueMaster) ship a
+None of the existing firmwares, official or custom, ship a
 native, first-class localization layer — English (or hardcoded strings) is
 the assumption baked into their UI code. R0N1N's default UI language is
 **Russian**, driven by a proper string-table localization architecture
@@ -49,15 +49,16 @@ bundle, at a cost of a few KB.
 
 ## The analogy
 
-Not "yet another Unleashed," but what GrapheneOS/LineageOS are to Android:
-a carefully assembled shell on top of an open base, with its own UX
+Not "yet another custom firmware," but what GrapheneOS/LineageOS are to
+Android: a carefully assembled shell on top of an open base, with its own UX
 philosophy and ecosystem — not a low-level kernel fork.
 
 ## Project boundaries (white-hat / legality)
 
 R0N1N is a legal open-source project that customizes the firmware of a
-commercially available device, in the spirit of Momentum/Unleashed/
-RogueMaster (all GPL-3.0, see `LICENSE`). All security features
+commercially available device, in the spirit of the community custom
+firmwares, and under the same GPL-3.0 license as the official firmware it
+is built on (see `LICENSE`). All security features
 (`SECURITY_TOOLKIT.md`) are intended only for the user's own devices, lab
 benches, CTF competitions, and authorized penetration testing, with
 explicit UI warnings and confirmation prompts for "sharp" operations. The

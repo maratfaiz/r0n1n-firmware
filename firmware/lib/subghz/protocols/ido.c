@@ -5,7 +5,6 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
 
 #define TAG "SubGhzProtocolIdo117/111"
 
@@ -22,7 +21,6 @@ struct SubGhzProtocolDecoderIDo {
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderIDo);
 
 struct SubGhzProtocolEncoderIDo {
     SubGhzProtocolEncoderBase base;
@@ -40,14 +38,14 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_ido_decoder = {
     .alloc = subghz_protocol_decoder_ido_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_ido_free,
 
     .feed = subghz_protocol_decoder_ido_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_ido_reset,
 
-    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
+    .get_hash_data = subghz_protocol_decoder_ido_get_hash_data,
     .deserialize = subghz_protocol_decoder_ido_deserialize,
-    .serialize = subghz_protocol_decoder_common_serialize,
+    .serialize = subghz_protocol_decoder_ido_serialize,
     .get_string = subghz_protocol_decoder_ido_get_string,
 };
 
@@ -63,8 +61,7 @@ const SubGhzProtocolEncoder subghz_protocol_ido_encoder = {
 const SubGhzProtocol subghz_protocol_ido = {
     .name = SUBGHZ_PROTOCOL_IDO_NAME,
     .type = SubGhzProtocolTypeDynamic,
-    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable |
-            SubGhzProtocolFlag_Save,
+    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable,
 
     .decoder = &subghz_protocol_ido_decoder,
     .encoder = &subghz_protocol_ido_encoder,
@@ -72,8 +69,23 @@ const SubGhzProtocol subghz_protocol_ido = {
 
 void* subghz_protocol_decoder_ido_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderIDo), &subghz_protocol_ido);
+    SubGhzProtocolDecoderIDo* instance = malloc(sizeof(SubGhzProtocolDecoderIDo));
+    instance->base.protocol = &subghz_protocol_ido;
+    instance->generic.protocol_name = instance->base.protocol->name;
+
+    return instance;
+}
+
+void subghz_protocol_decoder_ido_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIDo* instance = context;
+    free(instance);
+}
+
+void subghz_protocol_decoder_ido_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIDo* instance = context;
+    instance->decoder.parser_step = IDoDecoderStepReset;
 }
 
 void subghz_protocol_decoder_ido_feed(void* context, bool level, uint32_t duration) {
@@ -160,6 +172,22 @@ static void subghz_protocol_ido_check_remote_controller(SubGhzBlockGeneric* inst
     instance->btn = (code_fix >> 20) & 0x0F;
 }
 
+uint8_t subghz_protocol_decoder_ido_get_hash_data(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIDo* instance = context;
+    return subghz_protocol_blocks_get_hash_data(
+        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
+}
+
+SubGhzProtocolStatus subghz_protocol_decoder_ido_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIDo* instance = context;
+    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+}
+
 SubGhzProtocolStatus
     subghz_protocol_decoder_ido_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
@@ -177,12 +205,6 @@ void subghz_protocol_decoder_ido_get_string(void* context, FuriString* output) {
         instance->generic.data, instance->generic.data_count_bit);
     uint32_t code_fix = code_found_reverse & 0xFFFFFF;
     uint32_t code_hop = (code_found_reverse >> 24) & 0xFFFFFF;
-
-    // push protocol data to global variable
-    subghz_block_generic_global.btn_is_available = false;
-    subghz_block_generic_global.current_btn = instance->generic.btn;
-    subghz_block_generic_global.btn_length_bit = 4;
-    //
 
     furi_string_cat_printf(
         output,

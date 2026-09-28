@@ -10,9 +10,6 @@ import json5 from "json5";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const cfwSdkName = "@darkflippers/fz-sdk-ul/";
-const ofwSdkName = "@flipperdevices/fz-sdk/";
-
 async function build(config) {
     await esbuild.build({
         entryPoints: ["./dist/index.js"],
@@ -22,7 +19,7 @@ async function build(config) {
         bundle: true,
         minify: config.minify,
         external: [
-            "@darkflippers/fz-sdk-ul/*"
+            "@flipperdevices/fz-sdk/*"
         ],
         supported: {
             "array-spread": false,
@@ -76,9 +73,6 @@ async function build(config) {
 
     let outContents = fs.readFileSync(config.output, "utf8");
     outContents = "let exports = {};\n" + outContents;
-
-    // Transform CFW SDK name to OFW SDK name so all firmwares understand it
-    outContents = outContents.replaceAll(`require("${cfwSdkName}`, `require("${ofwSdkName}`);
 
     if (config.enforceSdkVersion) {
         const version = json5.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")).version;
@@ -153,11 +147,10 @@ async function upload(config) {
     port.write(`storage remove ${config.output}\x0d`);
     port.drain();
     await waitFor(">: ", 1000);
-    const appFileBuffer = Buffer.from(appFile, "utf8");
-    port.write(`storage write_chunk ${config.output} ${appFileBuffer.length}\x0d`);
+    port.write(`storage write_chunk ${config.output} ${appFile.length}\x0d`);
     await waitFor("Ready", 1000);
-    port.write(appFileBuffer);
-    await new Promise(resolve => port.drain(resolve));
+    port.write(appFile);
+    port.drain();
     await waitFor(">: ", 1000);
 
     console.log("Launching application");

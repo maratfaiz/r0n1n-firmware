@@ -44,11 +44,11 @@ static ViewPort* bt_statusbar_view_port_alloc(Bt* bt) {
 static void bt_pin_code_view_port_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     Bt* bt = context;
-    char pin_code_info[24];
+    char pin_code_info[48];
     canvas_draw_icon(canvas, 0, 0, &I_BLE_Pairing_128x64);
-    snprintf(pin_code_info, sizeof(pin_code_info), "Pairing code\n%06lu", bt->pin_code);
+    snprintf(pin_code_info, sizeof(pin_code_info), "Код сопряжения\n%06lu", bt->pin_code);
     elements_multiline_text_aligned(canvas, 64, 4, AlignCenter, AlignTop, pin_code_info);
-    elements_button_left(canvas, "Quit");
+    elements_button_left(canvas, "Выход");
 }
 
 static void bt_pin_code_view_port_input_callback(InputEvent* event, void* context) {
@@ -92,8 +92,6 @@ static void bt_pin_code_show(Bt* bt, uint32_t pin_code) {
         gui_add_view_port(bt->gui, bt->pin_code_view_port, GuiLayerFullscreen);
     }
     notification_message(bt->notification, &sequence_display_backlight_on);
-    if(bt->suppress_pin_screen) return;
-
     gui_view_port_send_to_front(bt->gui, bt->pin_code_view_port);
     view_port_enabled_set(bt->pin_code_view_port, true);
 }
@@ -107,19 +105,16 @@ static void bt_pin_code_hide(Bt* bt) {
 
 static bool bt_pin_code_verify_event_handler(Bt* bt, uint32_t pin) {
     furi_assert(bt);
-    bt->pin_code = pin;
     notification_message(bt->notification, &sequence_display_backlight_on);
-    if(bt->suppress_pin_screen) return true;
-
     FuriString* pin_str;
     if(!bt->dialog_message) {
         bt->dialog_message = dialog_message_alloc();
     }
     dialog_message_set_icon(bt->dialog_message, &I_BLE_Pairing_128x64, 0, 0);
-    pin_str = furi_string_alloc_printf("Verify code\n%06lu", pin);
+    pin_str = furi_string_alloc_printf("Проверьте код\n%06lu", pin);
     dialog_message_set_text(
         bt->dialog_message, furi_string_get_cstr(pin_str), 64, 4, AlignCenter, AlignTop);
-    dialog_message_set_buttons(bt->dialog_message, "Cancel", "OK", NULL);
+    dialog_message_set_buttons(bt->dialog_message, "Отмена", "OK", NULL);
     DialogMessageButton button = dialog_message_show(bt->dialogs, bt->dialog_message);
     furi_string_free(pin_str);
     return button == DialogMessageButtonCenter;
@@ -185,8 +180,6 @@ Bt* bt_alloc(void) {
 
     // API evnent
     bt->api_event = furi_event_flag_alloc();
-
-    bt->pin = 0;
 
     return bt;
 }
@@ -264,7 +257,6 @@ static bool bt_on_gap_event_callback(GapEvent event, void* context) {
     furi_assert(context);
     Bt* bt = context;
     bool ret = false;
-    bt->pin = 0;
     bool do_update_status = false;
     bool current_profile_is_serial =
         furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial);
@@ -273,7 +265,26 @@ static bool bt_on_gap_event_callback(GapEvent event, void* context) {
         // Update status bar
         bt->status = BtStatusConnected;
         do_update_status = true;
-        bt_open_rpc_connection(bt);
+        // Clear BT_RPC_EVENT_DISCONNECTED because it might be set from previous session
+        furi_event_flag_clear(bt->rpc_event, BT_RPC_EVENT_DISCONNECTED);
+
+        if(current_profile_is_serial) {
+            // Open RPC session
+            bt->rpc_session = rpc_session_open(bt->rpc, RpcOwnerBle);
+            if(bt->rpc_session) {
+                FURI_LOG_I(TAG, "Open RPC connection");
+                rpc_session_set_send_bytes_callback(bt->rpc_session, bt_rpc_send_bytes_callback);
+                rpc_session_set_buffer_is_empty_callback(
+                    bt->rpc_session, bt_serial_buffer_is_empty_callback);
+                rpc_session_set_context(bt->rpc_session, bt);
+                ble_profile_serial_set_event_callback(
+                    bt->current_profile, RPC_BUFFER_SIZE, bt_serial_event_callback, bt);
+                ble_profile_serial_set_rpc_active(
+                    bt->current_profile, FuriHalBtSerialRpcStatusActive);
+            } else {
+                FURI_LOG_W(TAG, "RPC is busy, failed to open new session");
+            }
+        }
         // Update battery level
         PowerInfo info;
         power_get_info(bt->power, &info);
@@ -303,14 +314,12 @@ static bool bt_on_gap_event_callback(GapEvent event, void* context) {
         do_update_status = true;
         ret = true;
     } else if(event.type == GapEventTypePinCodeShow) {
-        bt->pin = event.data.pin_code;
         BtMessage message = {
             .type = BtMessageTypePinCodeShow, .data.pin_code = event.data.pin_code};
         furi_check(
             furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
         ret = true;
     } else if(event.type == GapEventTypePinCodeVerify) {
-        bt->pin = event.data.pin_code;
         ret = bt_pin_code_verify_event_handler(bt, event.data.pin_code);
     } else if(event.type == GapEventTypeUpdateMTU) {
         bt->max_packet_size = event.data.max_packet_size;
@@ -368,35 +377,11 @@ static void bt_show_warning(Bt* bt, const char* text) {
         bt->dialog_message = dialog_message_alloc();
     }
     dialog_message_set_text(bt->dialog_message, text, 64, 28, AlignCenter, AlignCenter);
-    dialog_message_set_buttons(bt->dialog_message, "Quit", NULL, NULL);
+    dialog_message_set_buttons(bt->dialog_message, "Выход", NULL, NULL);
     dialog_message_show(bt->dialogs, bt->dialog_message);
 }
 
-void bt_open_rpc_connection(Bt* bt) {
-    if(!bt->rpc_session && bt->status == BtStatusConnected) {
-        // Clear BT_RPC_EVENT_DISCONNECTED because it might be set from previous session
-        furi_event_flag_clear(bt->rpc_event, BT_RPC_EVENT_DISCONNECTED);
-        if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial)) {
-            // Open RPC session
-            bt->rpc_session = rpc_session_open(bt->rpc, RpcOwnerBle);
-            if(bt->rpc_session) {
-                FURI_LOG_I(TAG, "Open RPC connection");
-                rpc_session_set_send_bytes_callback(bt->rpc_session, bt_rpc_send_bytes_callback);
-                rpc_session_set_buffer_is_empty_callback(
-                    bt->rpc_session, bt_serial_buffer_is_empty_callback);
-                rpc_session_set_context(bt->rpc_session, bt);
-                ble_profile_serial_set_event_callback(
-                    bt->current_profile, RPC_BUFFER_SIZE, bt_serial_event_callback, bt);
-                ble_profile_serial_set_rpc_active(
-                    bt->current_profile, FuriHalBtSerialRpcStatusActive);
-            } else {
-                FURI_LOG_W(TAG, "RPC is busy, failed to open new session");
-            }
-        }
-    }
-}
-
-void bt_close_rpc_connection(Bt* bt) {
+static void bt_close_rpc_connection(Bt* bt) {
     if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial) &&
        bt->rpc_session) {
         FURI_LOG_I(TAG, "Close RPC connection");
@@ -438,7 +423,7 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
         }
 
     } else {
-        bt_show_warning(bt, "Radio stack doesn't support this app");
+        bt_show_warning(bt, "Радиостек не поддерживает приложение");
         if(message->result) {
             *message->result = false;
         }
@@ -463,7 +448,7 @@ static void bt_apply_settings(Bt* bt) {
 
 static void bt_load_keys(Bt* bt) {
     if(!furi_hal_bt_is_gatt_gap_supported()) {
-        bt_show_warning(bt, "Unsupported radio stack");
+        bt_show_warning(bt, "Радиостек не поддерживается");
         bt->status = BtStatusUnavailable;
         return;
 

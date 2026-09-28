@@ -8,7 +8,6 @@
 
 #include "ibutton_key.h"
 #include "ibutton_protocols.h"
-#include "ibutton_write_targets.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,8 +18,6 @@ typedef enum {
     iButtonWorkerWriteSameKey,
     iButtonWorkerWriteNoDetect,
     iButtonWorkerWriteCannotWrite,
-    iButtonWorkerWriteStartTarget, // a new blank type is being attempted (progress UI)
-    iButtonWorkerWriteNoEnabledTarget, // nothing enabled that can write this key
 } iButtonWorkerWriteResult;
 
 typedef void (*iButtonWorkerReadCallback)(void* context);
@@ -34,21 +31,6 @@ typedef struct iButtonWorker iButtonWorker;
  * @return iButtonWorker* 
  */
 iButtonWorker* ibutton_worker_alloc(iButtonProtocols* protocols);
-
-/**
- * Limit which blank types a write may try. A worker starts at
- * ibutton_write_targets_default(), so honouring the user's setting is opt-in.
- * @param worker
- * @param mask mask of iButtonWriteTarget bits
- */
-void ibutton_worker_set_write_targets(iButtonWorker* worker, iButtonWriteTargetMask mask);
-
-/**
- * Name of the blank type last attempted, "" before the first one.
- * @param worker
- * @return a static string, never NULL
- */
-const char* ibutton_worker_get_write_chip_name(iButtonWorker* worker);
 
 /**
  * Free ibutton worker

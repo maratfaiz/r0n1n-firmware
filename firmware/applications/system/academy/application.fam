@@ -1,0 +1,12 @@
+App(
+    appid="academy",
+    name="Academy",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="academy_app",
+    requires=["gui", "storage"],
+    stack_size=2 * 1024,
+    fap_version="1.0",
+    fap_description="R0N1N Academy: learn to use Flipper Zero step by step",
+    fap_icon="academy_10px.png",
+    fap_category="Tools",
+)

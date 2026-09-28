@@ -360,7 +360,7 @@ void protocol_h10301_render_data(ProtocolH10301* protocol, FuriString* result) {
     furi_string_printf(
         result,
         "FC: %hhu\n"
-        "Card: %hu",
+        "Карта: %hu",
         data[0],
         (uint16_t)((data[1] << 8) | (data[2])));
 }

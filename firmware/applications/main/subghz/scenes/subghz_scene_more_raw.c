@@ -1,7 +1,6 @@
 #include "../subghz_i.h"
 
 enum SubmenuIndex {
-    SubmenuIndexDecode,
     SubmenuIndexEdit,
     SubmenuIndexDelete,
 };
@@ -16,21 +15,14 @@ void subghz_scene_more_raw_on_enter(void* context) {
 
     submenu_add_item(
         subghz->submenu,
-        "Decode",
-        SubmenuIndexDecode,
-        subghz_scene_more_raw_submenu_callback,
-        subghz);
-
-    submenu_add_item(
-        subghz->submenu,
-        "Rename",
+        "Переименовать",
         SubmenuIndexEdit,
         subghz_scene_more_raw_submenu_callback,
         subghz);
 
     submenu_add_item(
         subghz->submenu,
-        "Delete",
+        "Удалить",
         SubmenuIndexDelete,
         subghz_scene_more_raw_submenu_callback,
         subghz);
@@ -66,19 +58,6 @@ bool subghz_scene_more_raw_on_event(void* context, SceneManagerEvent event) {
                 scene_manager_set_scene_state(
                     subghz->scene_manager, SubGhzSceneMoreRAW, SubmenuIndexEdit);
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSaveName);
-                return true;
-            } else {
-                if(!scene_manager_search_and_switch_to_previous_scene(
-                       subghz->scene_manager, SubGhzSceneStart)) {
-                    scene_manager_stop(subghz->scene_manager);
-                    view_dispatcher_stop(subghz->view_dispatcher);
-                }
-            }
-        } else if(event.event == SubmenuIndexDecode) {
-            if(subghz_file_available(subghz)) {
-                scene_manager_set_scene_state(
-                    subghz->scene_manager, SubGhzSceneMoreRAW, SubmenuIndexDecode);
-                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneDecodeRAW);
                 return true;
             } else {
                 if(!scene_manager_search_and_switch_to_previous_scene(

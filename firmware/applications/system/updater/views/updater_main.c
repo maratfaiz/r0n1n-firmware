@@ -1,6 +1,7 @@
 #include <gui/gui_i.h>
 #include <gui/view.h>
 #include <gui/elements.h>
+#include <gui/r0n1n_ui.h>
 #include <gui/canvas.h>
 #include <assets_icons.h>
 #include <furi.h>
@@ -78,27 +79,38 @@ bool updater_main_input(InputEvent* event, void* context) {
 static void updater_main_draw_callback(Canvas* canvas, void* _model) {
     UpdaterProgressModel* model = _model;
 
-    canvas_set_font(canvas, FontPrimary);
+    canvas_set_font(canvas, FontSecondary);
 
     if(model->failed) {
-        canvas_draw_icon(canvas, 2, 22, &I_Warning_30x23);
-        canvas_draw_str_aligned(canvas, 40, 9, AlignLeft, AlignTop, "Update Failed!");
-        canvas_set_font(canvas, FontSecondary);
-
+        r0n1n_ui_header(canvas, NULL, "Сбой обновления", NULL, -1);
+        canvas_draw_icon(canvas, 3, 18, &I_Warning_30x23);
         elements_multiline_text_aligned(
-            canvas, 75, 26, AlignCenter, AlignTop, furi_string_get_cstr(model->status));
+            canvas, 81, 16, AlignCenter, AlignTop, furi_string_get_cstr(model->status));
 
-        canvas_draw_str_aligned(
-            canvas, 18, 55, AlignLeft, AlignTop, "to retry, hold       to abort");
-        canvas_draw_icon(canvas, 7, 54, &I_Ok_btn_9x9);
-        canvas_draw_icon(canvas, 75, 55, &I_Pin_back_arrow_10x8);
+        canvas_draw_line(canvas, 0, 51, 127, 51);
+        canvas_draw_icon(canvas, 2, 54, &I_Ok_btn_9x9);
+        canvas_draw_str(canvas, 14, 62, "повтор");
+        canvas_draw_str_aligned(canvas, 83, 62, AlignRight, AlignBottom, "держи");
+        canvas_draw_icon(canvas, 86, 55, &I_Pin_back_arrow_10x8);
+        canvas_draw_str_aligned(canvas, 126, 62, AlignRight, AlignBottom, "выход");
     } else {
-        canvas_draw_str_aligned(canvas, 55, 14, AlignLeft, AlignTop, "UPDATING");
-        canvas_set_font(canvas, FontSecondary);
+        r0n1n_ui_logo(canvas, (128 - R0N1N_UI_LOGO_WIDTH) / 2, 3, NULL);
+
+        // "── ОБНОВЛЕНИЕ ──"
+        r0n1n_ui_spaced_text(canvas, 64, 34, "ОБНОВЛЕНИЕ", 2, SIZE_MAX);
+        canvas_draw_line(canvas, 4, 30, 28, 30);
+        canvas_draw_line(canvas, 99, 30, 123, 30);
+
+        char percent[8];
+        snprintf(percent, sizeof(percent), "%u%%", (unsigned)MIN(model->progress, 100));
+        r0n1n_ui_progress(canvas, 4, 38, 92, 9, model->progress);
+        canvas_draw_str_aligned(canvas, 126, 46, AlignRight, AlignBottom, percent);
+
+        FuriString* status = furi_string_alloc_set(model->status);
+        r0n1n_ui_fit_width(canvas, status, 124);
         canvas_draw_str_aligned(
-            canvas, 64, 51, AlignCenter, AlignTop, furi_string_get_cstr(model->status));
-        canvas_draw_icon(canvas, 4, 5, &I_Updating_32x40);
-        elements_progress_bar(canvas, 42, 29, 80, (float)model->progress / 100);
+            canvas, 64, 61, AlignCenter, AlignBottom, furi_string_get_cstr(status));
+        furi_string_free(status);
     }
 }
 
@@ -111,7 +123,7 @@ UpdaterMainView* updater_main_alloc(void) {
     with_view_model(
         main_view->view,
         UpdaterProgressModel * model,
-        { model->status = furi_string_alloc_set("Waiting for SD card"); },
+        { model->status = furi_string_alloc_set("Ожидание SD-карты"); },
         true);
 
     view_set_context(main_view->view, main_view);

@@ -10,32 +10,18 @@ extern const SubGhzProtocolDecoder subghz_protocol_came_atomo_decoder;
 extern const SubGhzProtocolEncoder subghz_protocol_came_atomo_encoder;
 extern const SubGhzProtocol subghz_protocol_came_atomo;
 
-void atomo_decrypt(uint8_t* buff);
-
-void atomo_encrypt(uint8_t* buff);
-
-/**
- * Allocate SubGhzProtocolEncoderCameAtomo.
- * @param environment Pointer to a SubGhzEnvironment instance
- * @return SubGhzProtocolEncoderCameAtomo* pointer to a SubGhzProtocolEncoderCameAtomo instance
- */
-void* subghz_protocol_encoder_came_atomo_alloc(SubGhzEnvironment* environment);
-
-/**
- * Deserialize and generating an upload to send.
- * @param context Pointer to a SubGhzProtocolEncoderCameAtomo instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @return true On success
- */
-SubGhzProtocolStatus
-    subghz_protocol_encoder_came_atomo_deserialize(void* context, FlipperFormat* flipper_format);
-
 /**
  * Allocate SubGhzProtocolDecoderCameAtomo.
  * @param environment Pointer to a SubGhzEnvironment instance
  * @return SubGhzProtocolDecoderCameAtomo* pointer to a SubGhzProtocolDecoderCameAtomo instance
  */
 void* subghz_protocol_decoder_came_atomo_alloc(SubGhzEnvironment* environment);
+
+/**
+ * Free SubGhzProtocolDecoderCameAtomo.
+ * @param context Pointer to a SubGhzProtocolDecoderCameAtomo instance
+ */
+void subghz_protocol_decoder_came_atomo_free(void* context);
 
 /**
  * Reset decoder SubGhzProtocolDecoderCameAtomo.
@@ -50,6 +36,25 @@ void subghz_protocol_decoder_came_atomo_reset(void* context);
  * @param duration Duration of this level in, us
  */
 void subghz_protocol_decoder_came_atomo_feed(void* context, bool level, uint32_t duration);
+
+/**
+ * Getting the hash sum of the last randomly received parcel.
+ * @param context Pointer to a SubGhzProtocolDecoderCameAtomo instance
+ * @return hash Hash sum
+ */
+uint8_t subghz_protocol_decoder_came_atomo_get_hash_data(void* context);
+
+/**
+ * Serialize data SubGhzProtocolDecoderCameAtomo.
+ * @param context Pointer to a SubGhzProtocolDecoderCameAtomo instance
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param preset The modulation on which the signal was received, SubGhzRadioPreset
+ * @return status
+ */
+SubGhzProtocolStatus subghz_protocol_decoder_came_atomo_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset);
 
 /**
  * Deserialize data SubGhzProtocolDecoderCameAtomo.

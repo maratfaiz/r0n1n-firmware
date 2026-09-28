@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mf_classic_parser_util.h"
-
 #define TAG                    "H World"
 #define ROOM_SECTOR            1
 #define VIP_SECTOR             5
@@ -178,19 +176,10 @@ bool hworld_parse(const NfcDevice* device, FuriString* parsed_data) {
            (data_room_sec_key_b != hworld_standard_keys[ROOM_SECTOR].b))
             break;
 
-        // the key check above reads the sector 1 trailer; room, check-in and expiry all come
-        // from block 5, which it says nothing about
-        if(!mf_classic_parser_block_has_data(data, ACCESS_INFO_BLOCK)) {
-            FURI_LOG_D(TAG, "Access info block %u holds no data", ACCESS_INFO_BLOCK);
-            break;
-        }
         // Check whether this card is VIP
         const uint8_t* data_vip_sec_key_b_ptr = &data->block[VIP_SECTOR_KEY_BLOCK].data[10];
         uint64_t data_vip_sec_key_b = bit_lib_get_bits_64(data_vip_sec_key_b_ptr, 0, 48);
-        // the VIP verdict used to come from sector 5's trailer, which nothing here reads: an
-        // unread one compares unequal and the card was labelled Standard as a positive claim
-        const bool is_hworld_vip = mf_classic_is_key_found(data, VIP_SECTOR, MfClassicKeyTypeB) &&
-                                   (data_vip_sec_key_b == hworld_vip_keys[VIP_SECTOR].b);
+        bool is_hworld_vip = (data_vip_sec_key_b == hworld_vip_keys[VIP_SECTOR].b);
         uint8_t room_floor = data->block[ACCESS_INFO_BLOCK].data[13];
         uint8_t room_num = data->block[ACCESS_INFO_BLOCK].data[14];
 
@@ -210,11 +199,11 @@ bool hworld_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         furi_string_cat_printf(parsed_data, "\e#H World Card\n");
         furi_string_cat_printf(
-            parsed_data, "%s\n", is_hworld_vip ? "VIP card" : "Standard room key");
-        furi_string_cat_printf(parsed_data, "Room Num: %u%02u\n", room_floor, room_num);
+            parsed_data, "%s\n", is_hworld_vip ? "VIP-карта" : "Обычный ключ номера");
+        furi_string_cat_printf(parsed_data, "Номер комнаты: %u%02u\n", room_floor, room_num);
         furi_string_cat_printf(
             parsed_data,
-            "Check-in Date: \n%04u-%02d-%02d\n%02d:%02d:00\n",
+            "Заезд: \n%04u-%02d-%02d\n%02d:%02d:00\n",
             check_in_year,
             check_in_month,
             check_in_day,
@@ -222,7 +211,7 @@ bool hworld_parse(const NfcDevice* device, FuriString* parsed_data) {
             check_in_minute);
         furi_string_cat_printf(
             parsed_data,
-            "Expiration Date: \n%04u-%02d-%02d\n%02d:%02d:00",
+            "Выезд: \n%04u-%02d-%02d\n%02d:%02d:00",
             expire_year,
             expire_month,
             expire_day,

@@ -1,6 +1,5 @@
 import os
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, ClassVar, List, Optional, Tuple, Union
@@ -27,7 +26,6 @@ class FlipperAppType(Enum):
     STARTUP = "StartupHook"
     EXTERNAL = "External"
     MENUEXTERNAL = "MenuExternal"
-    EXTSETTINGS = "ExtSettings"
     METAPACKAGE = "Package"
     PLUGIN = "Plugin"
 
@@ -67,18 +65,12 @@ class FlipperApplication:
     sdk_headers: List[str] = field(default_factory=list)
     targets: List[str] = field(default_factory=lambda: ["all"])
     resources: Optional[str] = None
-    # Built-in apps use this too - see AppManager.get_builtin_app_folders().
-    sources: List[str] = field(default_factory=lambda: ["*.c*"])
 
     # .fap-specific
+    sources: List[str] = field(default_factory=lambda: ["*.c*"])
     fap_version: Union[str, Tuple[int]] = "0.1"
     fap_icon: Optional[str] = None
     fap_libs: List[str] = field(default_factory=list)
-    # Toolchain libraries to NOT link statically into this app. Symbols they
-    # would have provided are left undefined and resolved from the firmware API
-    # table at load time instead. Used to stop every .fal from carrying its own
-    # copy of the double-precision soft-float helpers ("gcc").
-    fap_exclude_libs: List[str] = field(default_factory=list)
     fap_category: str = ""
     fap_description: str = ""
     fap_author: str = ""
@@ -174,10 +166,7 @@ class AppManager:
                         f"App {kw.get('appid')} of type {apptype} cannot have '{app_property}' in manifest"
                     )
         else:
-            for app_property in (
-                "fap_extbuild",
-                "fap_private_libs",
-            ):  # , "fap_icon_assets"): TODO: Find a workaround for subghz_remote app
+            for app_property in ("fap_extbuild", "fap_private_libs", "fap_icon_assets"):
                 if kw.get(app_property):
                     raise FlipperManifestException(
                         f"App {kw.get('appid')} of type {apptype} must not have '{app_property}' in manifest"
@@ -268,7 +257,6 @@ class AppBuildset:
         FlipperAppType.PLUGIN: True,
         FlipperAppType.DEBUG: True,
         FlipperAppType.MENUEXTERNAL: False,
-        FlipperAppType.EXTSETTINGS: False,
     }
     DIST_APP_TYPES = list(
         # Applications that are installed on SD card
@@ -473,15 +461,10 @@ class AppBuildset:
         )
 
     def get_builtin_app_folders(self):
-        # Sources are gathered per folder, so a folder gets one merged list: an exclusion only
-        # filters the patterns handed to GatherSources() with it, and a folder can hold more than
-        # one built-in app - in applications/main/subghz an APP sits beside a STARTUP hook whose
-        # default "*.c*" would otherwise re-add what the app excluded. Sorted because this order
-        # ends up as link order.
-        folder_sources = defaultdict(set)
-        for app in self.get_builtin_apps():
-            folder_sources[app._appdir].update(app.sources)
         return sorted(
-            (appdir, tuple(sorted(sources)))
-            for appdir, sources in folder_sources.items()
+            set(
+                (app._appdir, source_type)
+                for app in self.get_builtin_apps()
+                for source_type in app.sources
+            )
         )

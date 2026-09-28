@@ -174,16 +174,16 @@ void protocol_paradox_render_data(ProtocolParadox* protocol, FuriString* result)
     furi_string_printf(
         result,
         "FC: %hhu\n"
-        "Card: %hu\n"
+        "Карта: %hu\n"
         "CRC: %hhu\n"
-        "Calc CRC: %hhu",
+        "Расч. CRC: %hhu",
         fc,
         card_id,
         card_crc,
         calc_crc);
 
     if(card_crc != calc_crc) {
-        furi_string_cat(result, "\nCRC Mismatch, Invalid Card!");
+        furi_string_cat(result, "\nCRC не совпадает, карта неверна!");
     }
 }
 
@@ -195,10 +195,10 @@ void protocol_paradox_render_brief_data(ProtocolParadox* protocol, FuriString* r
     uint8_t card_crc = bit_lib_get_bits_16(decoded_data, 34, 8);
     uint8_t calc_crc = protocol_paradox_calculate_checksum(fc, card_id);
 
-    furi_string_printf(result, "FC: %hhu; Card: %hu", fc, card_id);
+    furi_string_printf(result, "FC: %hhu; Карта: %hu", fc, card_id);
 
     if(calc_crc != card_crc) {
-        furi_string_cat(result, "\nCRC Mismatch, Invalid Card!");
+        furi_string_cat(result, "\nCRC не совпадает, карта неверна!");
     }
 }
 

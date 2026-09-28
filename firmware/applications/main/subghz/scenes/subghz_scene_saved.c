@@ -1,7 +1,5 @@
 #include "../subghz_i.h"
 
-#define TAG "SubGhzSceneSaved"
-
 void subghz_scene_saved_on_enter(void* context) {
     SubGhz* subghz = context;
 

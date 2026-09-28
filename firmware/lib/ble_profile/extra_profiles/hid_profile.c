@@ -9,12 +9,12 @@
 #include <usb_hid.h>
 #include <ble/ble.h>
 
-#define HID_INFO_BASE_USB_SPECIFICATION                    (0x0101)
-#define HID_INFO_COUNTRY_CODE                              (0x00)
-#define BLE_PROFILE_HID_INFO_FLAG_REMOTE_WAKE_MSK          (0x01)
+#define HID_INFO_BASE_USB_SPECIFICATION (0x0101)
+#define HID_INFO_COUNTRY_CODE (0x00)
+#define BLE_PROFILE_HID_INFO_FLAG_REMOTE_WAKE_MSK (0x01)
 #define BLE_PROFILE_HID_INFO_FLAG_NORMALLY_CONNECTABLE_MSK (0x02)
 
-#define BLE_PROFILE_HID_KB_MAX_KEYS   (6)
+#define BLE_PROFILE_HID_KB_MAX_KEYS (6)
 #define BLE_PROFILE_CONSUMER_MAX_KEYS (1)
 
 // Report ids cant be 0
@@ -74,10 +74,10 @@ static const uint8_t ble_profile_hid_report_map_data[] = {
     HID_REPORT_COUNT(BLE_PROFILE_HID_KB_MAX_KEYS),
     HID_REPORT_SIZE(8),
     HID_LOGICAL_MINIMUM(0),
-    HID_RI_LOGICAL_MAXIMUM(16, 255),
+    HID_LOGICAL_MAXIMUM(101),
     HID_USAGE_PAGE(HID_DESKTOP_KEYPAD),
     HID_USAGE_MINIMUM(0),
-    HID_RI_USAGE_MAXIMUM(16, 255),
+    HID_USAGE_MAXIMUM(101),
     HID_INPUT(HID_IOF_DATA | HID_IOF_ARRAY | HID_IOF_ABSOLUTE),
     HID_END_COLLECTION,
     // Mouse Report
@@ -380,11 +380,10 @@ bool ble_profile_hid_mouse_scroll(FuriHalBleProfileBase* profile, int8_t delta) 
 #define CONNECTION_INTERVAL_MAX (0x24)
 
 static GapConfig template_config = {
-    .adv_service =
-        {
-            .UUID_Type = UUID_TYPE_16,
-            .Service_UUID_16 = HUMAN_INTERFACE_DEVICE_SERVICE_UUID,
-        },
+    .adv_service = {
+        .UUID_Type = UUID_TYPE_16,
+        .Service_UUID_16 = HUMAN_INTERFACE_DEVICE_SERVICE_UUID,
+    },
     .appearance_char = GAP_APPEARANCE_KEYBOARD,
     .bonding_mode = true,
     .pairing_method = GapPairingPinCodeVerifyYesNo,
@@ -413,17 +412,19 @@ static void ble_profile_hid_get_config(GapConfig* config, FuriHalBleProfileParam
     }
 
     // Set advertise name
+    memset(config->adv_name, 0, sizeof(config->adv_name));
+    FuriString* name = furi_string_alloc_set(furi_hal_version_get_ble_local_device_name_ptr());
+
     const char* clicker_str = "Control";
     if(hid_profile_params && hid_profile_params->device_name_prefix) {
         clicker_str = hid_profile_params->device_name_prefix;
     }
-    snprintf(
-        config->adv_name,
-        sizeof(config->adv_name),
-        "%c%s %s",
-        furi_hal_version_get_ble_local_device_name_ptr()[0],
-        clicker_str,
-        furi_hal_version_get_name_ptr());
+    furi_string_replace_str(name, "Flipper", clicker_str);
+    if(furi_string_size(name) >= sizeof(config->adv_name)) {
+        furi_string_left(name, sizeof(config->adv_name) - 1);
+    }
+    memcpy(config->adv_name, furi_string_get_cstr(name), furi_string_size(name));
+    furi_string_free(name);
 }
 
 static const FuriHalBleProfileTemplate profile_callbacks = {

@@ -4,17 +4,10 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
 
-#include "../blocks/custom_btn_i.h"
+#define TAG "SubGhzProtocoAlutechAt4n"
 
-#define TAG "SubGhzProtocoAlutech_at_4n"
-
-#define SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE         0xFFFFFFFFFFFFFFFF
-#define SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES 32
-
-//variable used to bypass CounterMode settings if user just change Counter or Button
-static bool bypass = false;
+#define SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE 0xFFFFFFFF
 
 static const SubGhzBlockConst subghz_protocol_alutech_at_4n_const = {
     .te_short = 400,
@@ -29,22 +22,19 @@ struct SubGhzProtocolDecoderAlutech_at_4n {
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
 
+    uint64_t data;
     uint32_t crc;
     uint16_t header_count;
 
     const char* alutech_at_4n_rainbow_table_file_name;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderAlutech_at_4n);
 
 struct SubGhzProtocolEncoderAlutech_at_4n {
     SubGhzProtocolEncoderBase base;
 
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
-    const char* alutech_at_4n_rainbow_table_file_name;
-    uint32_t crc;
 };
-SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderAlutech_at_4n);
 
 typedef enum {
     Alutech_at_4nDecoderStepReset = 0,
@@ -53,14 +43,12 @@ typedef enum {
     Alutech_at_4nDecoderStepCheckDuration,
 } Alutech_at_4nDecoderStep;
 
-static uint8_t alutech_at4n_counter_mode = 0;
-
 const SubGhzProtocolDecoder subghz_protocol_alutech_at_4n_decoder = {
     .alloc = subghz_protocol_decoder_alutech_at_4n_alloc,
     .free = subghz_protocol_decoder_alutech_at_4n_free,
 
     .feed = subghz_protocol_decoder_alutech_at_4n_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_alutech_at_4n_reset,
 
     .get_hash_data = subghz_protocol_decoder_alutech_at_4n_get_hash_data,
     .serialize = subghz_protocol_decoder_alutech_at_4n_serialize,
@@ -69,57 +57,45 @@ const SubGhzProtocolDecoder subghz_protocol_alutech_at_4n_decoder = {
 };
 
 const SubGhzProtocolEncoder subghz_protocol_alutech_at_4n_encoder = {
-    .alloc = subghz_protocol_encoder_alutech_at_4n_alloc,
-    .free = subghz_protocol_encoder_common_free,
+    .alloc = NULL,
+    .free = NULL,
 
-    .deserialize = subghz_protocol_encoder_alutech_at_4n_deserialize,
-    .stop = subghz_protocol_encoder_common_stop,
-    .yield = subghz_protocol_encoder_common_yield,
+    .deserialize = NULL,
+    .stop = NULL,
+    .yield = NULL,
 };
 
 const SubGhzProtocol subghz_protocol_alutech_at_4n = {
     .name = SUBGHZ_PROTOCOL_ALUTECH_AT_4N_NAME,
     .type = SubGhzProtocolTypeDynamic,
-    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable |
-            SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save | SubGhzProtocolFlag_Send,
+    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable,
 
     .decoder = &subghz_protocol_alutech_at_4n_decoder,
     .encoder = &subghz_protocol_alutech_at_4n_encoder,
 };
 
-static void subghz_protocol_alutech_at_4n_remote_controller(
-    SubGhzBlockGeneric* instance,
-    uint8_t crc,
-    const char* file_name);
-
-void* subghz_protocol_encoder_alutech_at_4n_alloc(SubGhzEnvironment* environment) {
-    SubGhzProtocolEncoderAlutech_at_4n* instance = subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderAlutech_at_4n), &subghz_protocol_alutech_at_4n, 3, 512);
-    instance->alutech_at_4n_rainbow_table_file_name =
-        subghz_environment_get_alutech_at_4n_rainbow_table_file_name(environment);
-    if(instance->alutech_at_4n_rainbow_table_file_name) {
-        FURI_LOG_I(
-            TAG, "Loading rainbow table from %s", instance->alutech_at_4n_rainbow_table_file_name);
-    }
-    return instance;
-}
-
 /**
- * Read bytes from buffer array with rainbow table 
- * @param buffer Pointer to decrypted magic data buffer
+ * Read bytes from rainbow table
+ * @param file_name Full path to rainbow table the file
  * @param number_alutech_at_4n_magic_data number in the array
  * @return alutech_at_4n_magic_data
  */
-static uint32_t subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(
-    uint8_t* buffer,
+static uint32_t subghz_protocol_alutech_at_4n_get_magic_data_in_file(
+    const char* file_name,
     uint8_t number_alutech_at_4n_magic_data) {
+    if(!strcmp(file_name, "")) return SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
+
+    uint8_t buffer[sizeof(uint32_t)] = {0};
     uint32_t address = number_alutech_at_4n_magic_data * sizeof(uint32_t);
     uint32_t alutech_at_4n_magic_data = 0;
 
-    for(size_t i = address; i < (address + sizeof(uint32_t)); i++) {
-        alutech_at_4n_magic_data = (alutech_at_4n_magic_data << 8) | buffer[i];
+    if(subghz_keystore_raw_get_data(file_name, address, buffer, sizeof(uint32_t))) {
+        for(size_t i = 0; i < sizeof(uint32_t); i++) {
+            alutech_at_4n_magic_data = (alutech_at_4n_magic_data << 8) | buffer[i];
+        }
+    } else {
+        alutech_at_4n_magic_data = SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
     }
-
     return alutech_at_4n_magic_data;
 }
 
@@ -154,29 +130,17 @@ static uint8_t subghz_protocol_alutech_at_4n_decrypt_data_crc(uint8_t data) {
 }
 
 static uint64_t subghz_protocol_alutech_at_4n_decrypt(uint64_t data, const char* file_name) {
-    // load and decrypt rainbow table from file to buffer array in RAM
-    if(!file_name) return SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
-
-    uint8_t buffer[SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES] = {0};
-    uint8_t* buffer_ptr = (uint8_t*)&buffer;
-
-    if(subghz_keystore_raw_get_data(
-           file_name, 0, buffer, SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES)) {
-    } else {
-        return SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
-    }
-
     uint8_t* p = (uint8_t*)&data;
     uint32_t data1 = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
     uint32_t data2 = p[4] << 24 | p[5] << 16 | p[6] << 8 | p[7];
     uint32_t data3 = 0;
     uint32_t magic_data[] = {
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 0),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 1),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 2),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 3),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 4),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 5)};
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 0),
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 1),
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 2),
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 3),
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 4),
+        subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 5)};
 
     uint32_t i = magic_data[0];
     do {
@@ -200,316 +164,43 @@ static uint64_t subghz_protocol_alutech_at_4n_decrypt(uint64_t data, const char*
     return data;
 }
 
-static uint64_t subghz_protocol_alutech_at_4n_encrypt(uint64_t data, const char* file_name) {
-    // load and decrypt rainbow table from file to buffer array in RAM
-    if(!file_name) return SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
+// static uint64_t subghz_protocol_alutech_at_4n_encrypt(uint64_t data, const char* file_name) {
+//     uint8_t* p = (uint8_t*)&data;
+//     uint32_t data1 = 0;
+//     uint32_t data2 = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+//     uint32_t data3 = p[4] << 24 | p[5] << 16 | p[6] << 8 | p[7];
+//     uint32_t magic_data[] = {
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 6),
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 4),
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 5),
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 1),
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 2),
+//         subghz_protocol_alutech_at_4n_get_magic_data_in_file(file_name, 0)};
 
-    uint8_t buffer[SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES] = {0};
-    uint8_t* buffer_ptr = (uint8_t*)&buffer;
+//     do {
+//         data1 = data1 + magic_data[0];
+//         data2 = data2 + ((magic_data[1] + (data3 << 4)) ^
+//                          ((magic_data[2] + (data3 >> 5)) ^ (data1 + data3)));
+//         data3 = data3 + ((magic_data[3] + (data2 << 4)) ^
+//                          ((magic_data[4] + (data2 >> 5)) ^ (data1 + data2)));
+//     } while(data1 != magic_data[5]);
+//     p[0] = (uint8_t)(data2 >> 24);
+//     p[1] = (uint8_t)(data2 >> 16);
+//     p[3] = (uint8_t)data2;
+//     p[4] = (uint8_t)(data3 >> 24);
+//     p[5] = (uint8_t)(data3 >> 16);
+//     p[2] = (uint8_t)(data2 >> 8);
+//     p[6] = (uint8_t)(data3 >> 8);
+//     p[7] = (uint8_t)data3;
 
-    if(subghz_keystore_raw_get_data(
-           file_name, 0, buffer, SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES)) {
-    } else {
-        return SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE;
-    }
-
-    uint8_t* p = (uint8_t*)&data;
-    uint32_t data1 = 0;
-    uint32_t data2 = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
-    uint32_t data3 = p[4] << 24 | p[5] << 16 | p[6] << 8 | p[7];
-    uint32_t magic_data[] = {
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 6),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 4),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 5),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 1),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 2),
-        subghz_protocol_alutech_at_4n_get_magic_data_from_buffer(buffer_ptr, 0)};
-
-    do {
-        data1 = data1 + magic_data[0];
-        data2 = data2 + ((magic_data[1] + (data3 << 4)) ^
-                         ((magic_data[2] + (data3 >> 5)) ^ (data1 + data3)));
-        data3 = data3 + ((magic_data[3] + (data2 << 4)) ^
-                         ((magic_data[4] + (data2 >> 5)) ^ (data1 + data2)));
-    } while(data1 != magic_data[5]);
-    p[0] = (uint8_t)(data2 >> 24);
-    p[1] = (uint8_t)(data2 >> 16);
-    p[3] = (uint8_t)data2;
-    p[4] = (uint8_t)(data3 >> 24);
-    p[5] = (uint8_t)(data3 >> 16);
-    p[2] = (uint8_t)(data2 >> 8);
-    p[6] = (uint8_t)(data3 >> 8);
-    p[7] = (uint8_t)data3;
-
-    return data;
-}
-
-static bool subghz_protocol_alutech_at_4n_gen_data(
-    SubGhzProtocolEncoderAlutech_at_4n* instance,
-    uint8_t btn) {
-    uint64_t data = subghz_protocol_blocks_reverse_key(instance->generic.data, 64);
-
-    data = subghz_protocol_alutech_at_4n_decrypt(
-        data, instance->alutech_at_4n_rainbow_table_file_name);
-    uint8_t crc = data >> 56;
-    if(crc == subghz_protocol_alutech_at_4n_decrypt_data_crc((uint8_t)((data >> 8) & 0xFF))) {
-        instance->generic.btn = (uint8_t)data & 0xFF;
-        instance->generic.cnt = (uint16_t)(data >> 8) & 0xFFFF;
-        instance->generic.serial = (uint32_t)(data >> 24) & 0xFFFFFFFF;
-    }
-
-    // if we change counter/button in SignalSettings menu then we must bypass counter_modes, just gen and save signal file.
-    if(subghz_block_generic_global.cnt_need_override) bypass = true;
-
-    if((alutech_at4n_counter_mode == 0) || bypass) {
-        // Check for OFEX (overflow experimental) mode
-        if((furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF) || bypass) {
-            bypass = false;
-            // standart counter mode. PULL data from subghz_block_generic_global variables
-            if(!subghz_block_generic_global_counter_override_get(&instance->generic.cnt)) {
-                // if counter_override_get return FALSE then counter was not changed and we increase counter by standart mult value
-                if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
-                    instance->generic.cnt = 0;
-                } else {
-                    instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
-                }
-            }
-        } else {
-            //OFFEX mode
-            if((instance->generic.cnt + 0x1) > 0xFFFF) {
-                instance->generic.cnt = 0;
-            } else if(instance->generic.cnt >= 0x1 && instance->generic.cnt != 0xFFFE) {
-                instance->generic.cnt = 0xFFFE;
-            } else {
-                instance->generic.cnt++;
-            }
-        }
-    } else if(alutech_at4n_counter_mode == 1) {
-        // Mode 1
-        // 0000 / 0001 / FFFE / FFFF
-        if((instance->generic.cnt + 0x1) > 0xFFFF) {
-            instance->generic.cnt = 0;
-        } else if(instance->generic.cnt >= 0x1 && instance->generic.cnt != 0xFFFE) {
-            instance->generic.cnt = 0xFFFE;
-        } else {
-            instance->generic.cnt++;
-        }
-    } else {
-        // Mode 2
-        // 0x0000 / 0x0001 / 0x0002 / 0x0003 / 0x0004 / 0x0005
-        if(instance->generic.cnt >= 0x0005) {
-            instance->generic.cnt = 0;
-        } else {
-            instance->generic.cnt++;
-        }
-    }
-    crc = subghz_protocol_alutech_at_4n_decrypt_data_crc((uint8_t)(instance->generic.cnt & 0xFF));
-    data = (uint64_t)crc << 56 | (uint64_t)instance->generic.serial << 24 |
-           (uint32_t)instance->generic.cnt << 8 | btn;
-
-    data = subghz_protocol_alutech_at_4n_encrypt(
-        data, instance->alutech_at_4n_rainbow_table_file_name);
-    crc = subghz_protocol_alutech_at_4n_crc(data);
-    instance->generic.data = subghz_protocol_blocks_reverse_key(data, 64);
-    instance->crc = subghz_protocol_blocks_reverse_key(crc, 8);
-    return true;
-}
-
-bool subghz_protocol_alutech_at_4n_create_data(
-    void* context,
-    FlipperFormat* flipper_format,
-    uint32_t serial,
-    uint8_t btn,
-    uint16_t cnt,
-    SubGhzRadioPreset* preset) {
-    furi_assert(context);
-    SubGhzProtocolEncoderAlutech_at_4n* instance = context;
-    instance->generic.serial = serial;
-    instance->generic.cnt = cnt;
-    instance->generic.data_count_bit = 72;
-    if(subghz_protocol_alutech_at_4n_gen_data(instance, btn)) {
-        if((subghz_block_generic_serialize(&instance->generic, flipper_format, preset) !=
-            SubGhzProtocolStatusOk)) {
-            FURI_LOG_E(TAG, "Serialize error");
-            return false;
-        }
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            return false;
-        }
-        if(!flipper_format_insert_or_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
-            FURI_LOG_E(TAG, "Unable to add CRC");
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
- * Defines the button value for the current btn_id
- * Basic set | 0x11 | 0x22 | 0xFF | 0x44 | 0x33 |
- * @return Button code
- */
-static uint8_t subghz_protocol_alutech_at_4n_get_btn_code(void);
-
-/**
- * Generating an upload from data.
- * @param instance Pointer to a SubGhzProtocolEncoderAlutech instance
- * @return true Always; this encoder has no failure path
- */
-static bool subghz_protocol_encoder_alutech_at_4n_get_upload(
-    SubGhzProtocolEncoderAlutech_at_4n* instance,
-    uint8_t btn) {
-    furi_assert(instance);
-
-    // Save original button for later use
-    if(subghz_custom_btn_get_original() == 0) {
-        subghz_custom_btn_set_original(btn);
-    }
-
-    btn = subghz_protocol_alutech_at_4n_get_btn_code();
-
-    // override button if we change it with signal settings button editor
-    if(subghz_block_generic_global_button_override_get(&btn)) {
-        bypass = true;
-        FURI_LOG_D(TAG, "Button sucessfully changed to 0x%X", btn);
-    }
-
-    // Gen new key
-    if(!subghz_protocol_alutech_at_4n_gen_data(instance, btn)) {
-        return false;
-    }
-
-    size_t index = 0;
-    // Send preambula
-    for(uint8_t i = 0; i < 12; ++i) {
-        instance->encoder.upload[index++] =
-            level_duration_make(true, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short); // 1
-        instance->encoder.upload[index++] = level_duration_make(
-            false, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short); // 0
-    }
-
-    instance->encoder.upload[index - 1].duration +=
-        (uint32_t)subghz_protocol_alutech_at_4n_const.te_short * 9;
-
-    // Send key data
-    for(uint8_t i = 64; i > 0; --i) {
-        if(bit_read(instance->generic.data, i - 1)) {
-            //1
-            instance->encoder.upload[index++] =
-                level_duration_make(true, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short);
-            instance->encoder.upload[index++] =
-                level_duration_make(false, (uint32_t)subghz_protocol_alutech_at_4n_const.te_long);
-        } else {
-            //0
-            instance->encoder.upload[index++] =
-                level_duration_make(true, (uint32_t)subghz_protocol_alutech_at_4n_const.te_long);
-            instance->encoder.upload[index++] =
-                level_duration_make(false, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short);
-        }
-    }
-    // Send crc
-    for(uint8_t i = 8; i > 0; --i) {
-        if(bit_read(instance->crc, i - 1)) {
-            //1
-            instance->encoder.upload[index++] =
-                level_duration_make(true, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short);
-            instance->encoder.upload[index++] =
-                level_duration_make(false, (uint32_t)subghz_protocol_alutech_at_4n_const.te_long);
-        } else {
-            //0
-            instance->encoder.upload[index++] =
-                level_duration_make(true, (uint32_t)subghz_protocol_alutech_at_4n_const.te_long);
-            instance->encoder.upload[index++] =
-                level_duration_make(false, (uint32_t)subghz_protocol_alutech_at_4n_const.te_short);
-        }
-    }
-    // Inter-frame silence
-    instance->encoder.upload[index - 1].duration +=
-        (uint32_t)subghz_protocol_alutech_at_4n_const.te_long * 20;
-
-    size_t size_upload = index;
-
-    if(size_upload > instance->encoder.size_upload) {
-        FURI_LOG_E(TAG, "Size upload exceeds allocated encoder buffer.");
-        return false;
-    } else {
-        instance->encoder.size_upload = size_upload;
-    }
-    return true;
-}
-
-SubGhzProtocolStatus subghz_protocol_encoder_alutech_at_4n_deserialize(
-    void* context,
-    FlipperFormat* flipper_format) {
-    furi_assert(context);
-    SubGhzProtocolEncoderAlutech_at_4n* instance = context;
-    SubGhzProtocolStatus res = SubGhzProtocolStatusError;
-    do {
-        if(SubGhzProtocolStatusOk !=
-           subghz_block_generic_deserialize(&instance->generic, flipper_format)) {
-            FURI_LOG_E(TAG, "Deserialize error");
-            break;
-        }
-
-        if(!flipper_format_read_uint32(flipper_format, "CRC", (uint32_t*)&instance->crc, 1)) {
-            FURI_LOG_E(TAG, "Missing CRC");
-            break;
-        }
-
-        // Optional value
-        flipper_format_read_uint32(
-            flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            alutech_at4n_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-            alutech_at4n_counter_mode = 0;
-        }
-
-        subghz_protocol_alutech_at_4n_remote_controller(
-            &instance->generic, instance->crc, instance->alutech_at_4n_rainbow_table_file_name);
-
-        subghz_protocol_encoder_alutech_at_4n_get_upload(instance, instance->generic.btn);
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        uint8_t key_data[sizeof(uint64_t)] = {0};
-        for(size_t i = 0; i < sizeof(uint64_t); i++) {
-            key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
-        }
-        if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
-            break;
-        }
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        if(!flipper_format_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
-            FURI_LOG_E(TAG, "Unable to add CRC");
-            break;
-        }
-
-        instance->encoder.is_running = true;
-
-        res = SubGhzProtocolStatusOk;
-    } while(false);
-
-    return res;
-}
+//     return data;
+// }
 
 void* subghz_protocol_decoder_alutech_at_4n_alloc(SubGhzEnvironment* environment) {
-    SubGhzProtocolDecoderAlutech_at_4n* instance = subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderAlutech_at_4n), &subghz_protocol_alutech_at_4n);
+    SubGhzProtocolDecoderAlutech_at_4n* instance =
+        malloc(sizeof(SubGhzProtocolDecoderAlutech_at_4n));
+    instance->base.protocol = &subghz_protocol_alutech_at_4n;
+    instance->generic.protocol_name = instance->base.protocol->name;
     instance->alutech_at_4n_rainbow_table_file_name =
         subghz_environment_get_alutech_at_4n_rainbow_table_file_name(environment);
     if(instance->alutech_at_4n_rainbow_table_file_name) {
@@ -524,6 +215,12 @@ void subghz_protocol_decoder_alutech_at_4n_free(void* context) {
     SubGhzProtocolDecoderAlutech_at_4n* instance = context;
     instance->alutech_at_4n_rainbow_table_file_name = NULL;
     free(instance);
+}
+
+void subghz_protocol_decoder_alutech_at_4n_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderAlutech_at_4n* instance = context;
+    instance->decoder.parser_step = Alutech_at_4nDecoderStepReset;
 }
 
 void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint32_t duration) {
@@ -544,12 +241,13 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
             instance->decoder.parser_step = Alutech_at_4nDecoderStepReset;
             break;
         }
-        if((instance->header_count > 9) &&
+        if((instance->header_count > 2) &&
            (DURATION_DIFF(duration, subghz_protocol_alutech_at_4n_const.te_short * 10) <
             subghz_protocol_alutech_at_4n_const.te_delta * 10)) {
             // Found header
             instance->decoder.parser_step = Alutech_at_4nDecoderStepSaveDuration;
             instance->decoder.decode_data = 0;
+            instance->data = 0;
             instance->decoder.decode_count_bit = 0;
         } else {
             instance->decoder.parser_step = Alutech_at_4nDecoderStepReset;
@@ -582,8 +280,8 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
                 instance->decoder.parser_step = Alutech_at_4nDecoderStepReset;
                 if(instance->decoder.decode_count_bit ==
                    subghz_protocol_alutech_at_4n_const.min_count_bit_for_found) {
-                    if(instance->generic.data != instance->generic.data_2) {
-                        instance->generic.data = instance->generic.data_2;
+                    if(instance->generic.data != instance->data) {
+                        instance->generic.data = instance->data;
 
                         instance->generic.data_count_bit = instance->decoder.decode_count_bit;
                         instance->crc = instance->decoder.decode_data;
@@ -592,6 +290,7 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
                             instance->base.callback(&instance->base, instance->base.context);
                     }
                     instance->decoder.decode_data = 0;
+                    instance->data = 0;
                     instance->decoder.decode_count_bit = 0;
                     instance->header_count = 0;
                 }
@@ -604,7 +303,7 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
                  subghz_protocol_alutech_at_4n_const.te_delta * 2)) {
                 subghz_protocol_blocks_add_bit(&instance->decoder, 1);
                 if(instance->decoder.decode_count_bit == 64) {
-                    instance->generic.data_2 = instance->decoder.decode_data;
+                    instance->data = instance->decoder.decode_data;
                     instance->decoder.decode_data = 0;
                 }
                 instance->decoder.parser_step = Alutech_at_4nDecoderStepSaveDuration;
@@ -616,7 +315,7 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
                  subghz_protocol_alutech_at_4n_const.te_delta)) {
                 subghz_protocol_blocks_add_bit(&instance->decoder, 0);
                 if(instance->decoder.decode_count_bit == 64) {
-                    instance->generic.data_2 = instance->decoder.decode_data;
+                    instance->data = instance->decoder.decode_data;
                     instance->decoder.decode_data = 0;
                 }
                 instance->decoder.parser_step = Alutech_at_4nDecoderStepSaveDuration;
@@ -678,12 +377,6 @@ static void subghz_protocol_alutech_at_4n_remote_controller(
         instance->cnt = 0;
         instance->serial = 0;
     }
-
-    // Save original button for later use
-    if(subghz_custom_btn_get_original() == 0) {
-        subghz_custom_btn_set_original(instance->btn);
-    }
-    subghz_custom_btn_set_max(4);
 }
 
 uint8_t subghz_protocol_decoder_alutech_at_4n_get_hash_data(void* context) {
@@ -700,12 +393,8 @@ SubGhzProtocolStatus subghz_protocol_decoder_alutech_at_4n_serialize(
     SubGhzProtocolDecoderAlutech_at_4n* instance = context;
     SubGhzProtocolStatus res =
         subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
-    if(!flipper_format_rewind(flipper_format)) {
-        FURI_LOG_E(TAG, "Rewind error");
-        res = SubGhzProtocolStatusErrorParserOthers;
-    }
     if((res == SubGhzProtocolStatusOk) &&
-       !flipper_format_insert_or_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
+       !flipper_format_write_uint32(flipper_format, "CRC", &instance->crc, 1)) {
         FURI_LOG_E(TAG, "Unable to add CRC");
         res = SubGhzProtocolStatusErrorParserOthers;
     }
@@ -736,118 +425,8 @@ SubGhzProtocolStatus subghz_protocol_decoder_alutech_at_4n_deserialize(
             ret = SubGhzProtocolStatusErrorParserOthers;
             break;
         }
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            alutech_at4n_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-            alutech_at4n_counter_mode = 0;
-        }
-
     } while(false);
     return ret;
-}
-
-static uint8_t subghz_protocol_alutech_at_4n_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x11:
-            btn = 0x22;
-            break;
-        case 0x22:
-            btn = 0x11;
-            break;
-        case 0xFF:
-            btn = 0x11;
-            break;
-        case 0x44:
-            btn = 0x11;
-            break;
-        case 0x33:
-            btn = 0x11;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x11:
-            btn = 0x44;
-            break;
-        case 0x22:
-            btn = 0x44;
-            break;
-        case 0xFF:
-            btn = 0x44;
-            break;
-        case 0x44:
-            btn = 0xFF;
-            break;
-        case 0x33:
-            btn = 0x44;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x11:
-            btn = 0x33;
-            break;
-        case 0x22:
-            btn = 0x33;
-            break;
-        case 0xFF:
-            btn = 0x33;
-            break;
-        case 0x44:
-            btn = 0x33;
-            break;
-        case 0x33:
-            btn = 0x22;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_RIGHT) {
-        switch(original_btn_code) {
-        case 0x11:
-            btn = 0xFF;
-            break;
-        case 0x22:
-            btn = 0xFF;
-            break;
-        case 0xFF:
-            btn = 0x22;
-            break;
-        case 0x44:
-            btn = 0x22;
-            break;
-        case 0x33:
-            btn = 0xFF;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
 }
 
 void subghz_protocol_decoder_alutech_at_4n_get_string(void* context, FuriString* output) {
@@ -858,27 +437,18 @@ void subghz_protocol_decoder_alutech_at_4n_get_string(void* context, FuriString*
     uint32_t code_found_hi = instance->generic.data >> 32;
     uint32_t code_found_lo = instance->generic.data & 0x00000000ffffffff;
 
-    // push protocol data to global variable
-    subghz_block_generic_global.cnt_is_available = true;
-    subghz_block_generic_global.cnt_length_bit = 16;
-    subghz_block_generic_global.current_cnt = instance->generic.cnt;
-
-    subghz_block_generic_global.btn_is_available = true;
-    subghz_block_generic_global.current_btn = instance->generic.btn;
-    subghz_block_generic_global.btn_length_bit = 8;
-    //
-
     furi_string_cat_printf(
         output,
-        "%s\r\n"
-        "Key:0x%08lX%08lX\nCRC:%02X  %dbit\r\n"
+        "%s %d\r\n"
+        "Key:0x%08lX%08lX%02X\r\n"
         "Sn:0x%08lX  Btn:0x%01X\r\n"
-        "Cnt:%04lX\r\n",
+        "Cnt:0x%03lX\r\n",
+
         instance->generic.protocol_name,
+        instance->generic.data_count_bit,
         code_found_hi,
         code_found_lo,
         (uint8_t)instance->crc,
-        instance->generic.data_count_bit,
         instance->generic.serial,
         instance->generic.btn,
         instance->generic.cnt);

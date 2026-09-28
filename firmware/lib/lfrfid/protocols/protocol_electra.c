@@ -406,7 +406,8 @@ bool protocol_electra_write_data(ProtocolElectra* protocol, void* data) {
         request->t5577.block[4] = protocol->encoded_epilogue & 0xFFFFFFFF;
         request->t5577.blocks_to_write = 5;
         result = true;
-    } else if(request->write_type == LFRFIDWriteTypeEM4305) {
+    }
+    if(request->write_type == LFRFIDWriteTypeEM4305) {
         request->em4305.word[4] =
             (EM4x05_MODULATION_MANCHESTER | EM4x05_SET_BITRATE(64) | (8 << EM4x05_MAXBLOCK_SHIFT));
         uint64_t encoded_data_reversed = 0;
@@ -434,7 +435,7 @@ void protocol_electra_render_data(ProtocolElectra* protocol, FuriString* result)
 
 const ProtocolBase protocol_electra = {
     .name = "Electra",
-    .manufacturer = "Electra",
+    .manufacturer = "Electra Group",
     .data_size = ELECTRA_DECODED_DATA_SIZE,
     .features = LFRFIDFeatureASK | LFRFIDFeaturePSK,
     .validate_count = 3,

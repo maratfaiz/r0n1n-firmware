@@ -29,35 +29,35 @@
  */
 
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
+
+#include <flipper_application/flipper_application.h>
+#include <applications/services/locale/locale.h>
+#include <datetime/datetime.h>
 
 #include <lib/nfc/protocols/mf_desfire/mf_desfire.h>
-
-#include <applications/services/locale/locale.h>
-#include <datetime.h>
 
 static const MfDesfireApplicationId opal_app_id = {.data = {0x31, 0x45, 0x53}};
 
 static const MfDesfireFileId opal_file_id = 0x07;
 
 static const char* opal_modes[5] =
-    {"Rail / Metro", "Ferry / Light Rail", "Bus", "Unknown mode", "Manly Ferry"};
+    {"Поезд / метро", "Паром / трамвай", "Автобус", "Неизвестный вид", "Manly Ferry"};
 
 static const char* opal_usages[14] = {
-    "New / Unused",
-    "Tap on: new journey",
-    "Tap on: transfer from same mode",
-    "Tap on: transfer from other mode",
+    "Новый / не использован",
+    "Вход: новая поездка",
+    "Вход: пересадка (тот же вид)",
+    "Вход: пересадка (другой вид)",
     NULL, // Manly Ferry: new journey
     NULL, // Manly Ferry: transfer from ferry
     NULL, // Manly Ferry: transfer from other
-    "Tap off: distance fare",
-    "Tap off: flat fare",
-    "Automated tap off: failed to tap off",
-    "Tap off: end of trip without start",
-    "Tap off: reversal",
-    "Tap on: rejected",
-    "Unknown usage",
+    "Выход: по расстоянию",
+    "Выход: фикс. тариф",
+    "Авто-выход: не удалось",
+    "Выход: без начала поездки",
+    "Выход: отмена",
+    "Вход: отказ",
+    "Неизвестное исп.",
 };
 
 // Opal file 0x7 structure. Assumes a little-endian CPU.
@@ -82,7 +82,7 @@ static_assert(sizeof(OpalFile) == 16, "OpalFile");
 //
 // Opal measures days since 1980-01-01 and minutes since midnight, and presumes
 // all days are 1440 minutes.
-static void opal_days_minutes_to_datetime(uint16_t days, uint16_t minutes, DateTime* out) {
+static void opal_date_time_to_furi(uint16_t days, uint16_t minutes, DateTime* out) {
     out->year = 1980;
     out->month = 1;
     // 1980-01-01 is a Tuesday
@@ -155,7 +155,7 @@ static bool opal_parse(const NfcDevice* device, FuriString* parsed_data) {
         const int32_t balance_dollars = balance / 100;
 
         DateTime timestamp;
-        opal_days_minutes_to_datetime(opal_file->days, opal_file->minutes, &timestamp);
+        opal_date_time_to_furi(opal_file->days, opal_file->minutes, &timestamp);
 
         // Usages 4..6 associated with the Manly Ferry, which correspond to
         // usages 1..3 for other modes.
@@ -194,16 +194,16 @@ static bool opal_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         furi_string_cat_printf(
             parsed_data,
-            "\nWeekly journeys: %hhu, Txn #%hu\n",
+            "\nПоездок за неделю: %hhu, опер. #%hu\n",
             opal_file->weekly_journeys,
             opal_file->txn_number);
 
         if(opal_file->auto_topup) {
-            furi_string_cat_str(parsed_data, "Auto-topup enabled\n");
+            furi_string_cat_str(parsed_data, "Автопополнение вкл.\n");
         }
 
         if(opal_file->blocked) {
-            furi_string_cat_str(parsed_data, "Card blocked\n");
+            furi_string_cat_str(parsed_data, "Карта заблокирована\n");
         }
 
         parsed = true;

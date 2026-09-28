@@ -10,9 +10,8 @@
 
 #define TAG "FuriHalVersion"
 
-#define FURI_HAL_VERSION_OTP_HEADER_MAGIC (0xBABE)
-#define FURI_HAL_VERSION_OTP_ADDRESS      (OTP_AREA_BASE)
-#define FURI_HAL_VERSION_PLATFORM_ID      (0x0080e126)
+#define FURI_HAL_VERSION_OTP_HEADER_MAGIC 0xBABE
+#define FURI_HAL_VERSION_OTP_ADDRESS      OTP_AREA_BASE
 
 /** OTP V0 Structure: prototypes and early EVT */
 typedef struct {
@@ -91,7 +90,7 @@ typedef struct {
 
 static FuriHalVersion furi_hal_version = {0};
 
-void furi_hal_version_set_name(const char* name) {
+static void furi_hal_version_set_name(const char* name) {
     if(name != NULL) {
         strlcpy(furi_hal_version.name, name, FURI_HAL_VERSION_ARRAY_NAME_LENGTH);
         snprintf(
@@ -107,17 +106,14 @@ void furi_hal_version_set_name(const char* name) {
 
     // BLE Mac address
     uint32_t udn = LL_FLASH_GetUDN();
-    if(version_get_custom_name(NULL) != NULL) {
-        udn = *((uint32_t*)version_get_custom_name(NULL));
-    }
-
-    uint32_t platform_id = FURI_HAL_VERSION_PLATFORM_ID;
-    furi_hal_version.ble_mac[0] = (uint8_t)((udn >> 0) & 0xFF);
-    furi_hal_version.ble_mac[1] = (uint8_t)((udn >> 8) & 0xFF);
-    furi_hal_version.ble_mac[2] = (uint8_t)((udn >> 16) & 0xFF);
-    furi_hal_version.ble_mac[3] = (uint8_t)((platform_id >> 0) & 0xFF);
-    furi_hal_version.ble_mac[4] = (uint8_t)((platform_id >> 8) & 0xFF);
-    furi_hal_version.ble_mac[5] = (uint8_t)((platform_id >> 16) & 0xFF);
+    uint32_t company_id = LL_FLASH_GetSTCompanyID();
+    uint32_t device_id = LL_FLASH_GetDeviceID();
+    furi_hal_version.ble_mac[0] = (uint8_t)(udn & 0x000000FF);
+    furi_hal_version.ble_mac[1] = (uint8_t)((udn & 0x0000FF00) >> 8);
+    furi_hal_version.ble_mac[2] = (uint8_t)((udn & 0x00FF0000) >> 16);
+    furi_hal_version.ble_mac[3] = (uint8_t)device_id;
+    furi_hal_version.ble_mac[4] = (uint8_t)(company_id & 0x000000FF);
+    furi_hal_version.ble_mac[5] = (uint8_t)((company_id & 0x0000FF00) >> 8);
 }
 
 static void furi_hal_version_load_otp_default(void) {
@@ -133,11 +129,7 @@ static void furi_hal_version_load_otp_v0(void) {
     furi_hal_version.board_body = otp->board_body;
     furi_hal_version.board_connect = otp->board_connect;
 
-    if(version_get_custom_name(NULL) != NULL) {
-        furi_hal_version_set_name(version_get_custom_name(NULL));
-    } else {
-        furi_hal_version_set_name(otp->name);
-    }
+    furi_hal_version_set_name(otp->name);
 }
 
 static void furi_hal_version_load_otp_v1(void) {
@@ -151,11 +143,7 @@ static void furi_hal_version_load_otp_v1(void) {
     furi_hal_version.board_color = otp->board_color;
     furi_hal_version.board_region = otp->board_region;
 
-    if(version_get_custom_name(NULL) != NULL) {
-        furi_hal_version_set_name(version_get_custom_name(NULL));
-    } else {
-        furi_hal_version_set_name(otp->name);
-    }
+    furi_hal_version_set_name(otp->name);
 }
 
 static void furi_hal_version_load_otp_v2(void) {
@@ -175,11 +163,7 @@ static void furi_hal_version_load_otp_v2(void) {
     if(otp->board_color != 0xFF) {
         furi_hal_version.board_color = otp->board_color;
         furi_hal_version.board_region = otp->board_region;
-        if(version_get_custom_name(NULL) != NULL) {
-            furi_hal_version_set_name(version_get_custom_name(NULL));
-        } else {
-            furi_hal_version_set_name(otp->name);
-        }
+        furi_hal_version_set_name(otp->name);
     } else {
         furi_hal_version.board_color = 0;
         furi_hal_version.board_region = 0;
@@ -255,19 +239,11 @@ uint8_t furi_hal_version_get_hw_connect(void) {
 }
 
 FuriHalVersionRegion furi_hal_version_get_hw_region(void) {
-    return FuriHalVersionRegionUnknown;
-}
-
-FuriHalVersionRegion furi_hal_version_get_hw_region_otp(void) {
     return furi_hal_version.board_region;
 }
 
 const char* furi_hal_version_get_hw_region_name(void) {
-    return "R00";
-}
-
-const char* furi_hal_version_get_hw_region_name_otp(void) {
-    switch(furi_hal_version_get_hw_region_otp()) {
+    switch(furi_hal_version_get_hw_region()) {
     case FuriHalVersionRegionUnknown:
         return "R00";
     case FuriHalVersionRegionEuRu:
@@ -314,13 +290,6 @@ size_t furi_hal_version_uid_size(void) {
     return 64 / 8;
 }
 
-const uint8_t* furi_hal_version_uid_default(void) {
-    return (const uint8_t*)UID64_BASE;
-}
-
 const uint8_t* furi_hal_version_uid(void) {
-    if(version_get_custom_name(NULL) != NULL) {
-        return (const uint8_t*)&(*((uint32_t*)version_get_custom_name(NULL)));
-    }
     return (const uint8_t*)UID64_BASE;
 }

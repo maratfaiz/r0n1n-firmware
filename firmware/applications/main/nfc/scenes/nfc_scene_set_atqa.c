@@ -4,8 +4,7 @@
 
 static void nfc_scene_set_atqa_byte_input_changed_callback(void* context) {
     NfcApp* instance = context;
-    uint8_t atqa_msb[2] = {instance->byte_input_store[1], instance->byte_input_store[0]};
-    iso14443_3a_set_atqa(instance->iso14443_3a_edit_data, atqa_msb);
+    iso14443_3a_set_atqa(instance->iso14443_3a_edit_data, instance->byte_input_store);
 }
 
 void nfc_scene_set_atqa_on_enter(void* context) {
@@ -15,7 +14,7 @@ void nfc_scene_set_atqa_on_enter(void* context) {
 
     // Setup view
     ByteInput* byte_input = instance->byte_input;
-    byte_input_set_header_text(byte_input, "Enter ATQA in hex");
+    byte_input_set_header_text(byte_input, "Введите ATQA (hex)");
     byte_input_set_result_callback(
         byte_input,
         nfc_protocol_support_common_byte_input_done_callback,

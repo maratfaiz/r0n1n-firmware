@@ -1,4 +1,5 @@
-#include "bt_api.h"
+#include "bt_i.h"
+#include <profiles/serial_profile.h>
 
 FuriHalBleProfileBase* bt_profile_start(
     Bt* bt,

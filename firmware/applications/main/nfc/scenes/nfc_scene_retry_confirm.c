@@ -10,10 +10,10 @@ void nfc_scene_retry_confirm_on_enter(void* context) {
     NfcApp* nfc = context;
     DialogEx* dialog_ex = nfc->dialog_ex;
 
-    dialog_ex_set_left_button_text(dialog_ex, "Retry");
-    dialog_ex_set_right_button_text(dialog_ex, "Stay");
-    dialog_ex_set_header(dialog_ex, "Retry Reading?", 64, 0, AlignCenter, AlignTop);
-    dialog_ex_set_text(dialog_ex, "All unsaved data will be lost", 64, 12, AlignCenter, AlignTop);
+    dialog_ex_set_left_button_text(dialog_ex, "Повтор");
+    dialog_ex_set_right_button_text(dialog_ex, "Остаться");
+    dialog_ex_set_header(dialog_ex, "Прочитать снова?", 64, 0, AlignCenter, AlignTop);
+    dialog_ex_set_text(dialog_ex, "Несохраненные\nданные удалятся", 64, 12, AlignCenter, AlignTop);
     dialog_ex_set_context(dialog_ex, nfc);
     dialog_ex_set_result_callback(dialog_ex, nfc_scene_retry_confirm_dialog_callback);
 

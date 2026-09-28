@@ -4,17 +4,18 @@ void lfrfid_scene_emulate_on_enter(void* context) {
     LfRfid* app = context;
     Widget* widget = app->widget;
 
-    FuriString* display_text = furi_string_alloc_set("\e#Emulating\e#\n");
+    FuriString* display_text = furi_string_alloc_set("\e#Эмуляция\e#\n");
 
-    furi_string_cat_printf(
-        display_text,
-        "[%s]\n%s",
-        protocol_dict_get_name(app->dict, app->protocol_id),
-        furi_string_empty(app->file_name) ? "Unsaved Tag" : furi_string_get_cstr(app->file_name));
+    if(furi_string_empty(app->file_name)) {
+        furi_string_cat(display_text, "Не сохранено\n");
+        furi_string_cat(display_text, protocol_dict_get_name(app->dict, app->protocol_id));
+    } else {
+        furi_string_cat(display_text, app->file_name);
+    }
 
     widget_add_icon_element(widget, 0, 0, &I_NFC_dolphin_emulation_51x64);
     widget_add_text_box_element(
-        widget, 51, 6, 79, 50, AlignCenter, AlignTop, furi_string_get_cstr(display_text), false);
+        widget, 55, 16, 67, 48, AlignCenter, AlignTop, furi_string_get_cstr(display_text), true);
 
     furi_string_free(display_text);
 

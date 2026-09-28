@@ -10,7 +10,6 @@ typedef enum {
     SubGhzNotificationStateTx,
     SubGhzNotificationStateRx,
     SubGhzNotificationStateRxDone,
-    SubGhzNotificationStateTxWait,
 } SubGhzNotificationState;
 
 /** SubGhzTxRx state */
@@ -24,7 +23,7 @@ typedef enum {
 /** SubGhzHopperState state */
 typedef enum {
     SubGhzHopperStateOFF,
-    SubGhzHopperStateRunning,
+    SubGhzHopperStateRunnig,
     SubGhzHopperStatePause,
     SubGhzHopperStateRSSITimeOut,
 } SubGhzHopperState;
@@ -62,8 +61,6 @@ typedef enum {
     SubGhzLoadKeyStateUnknown,
     SubGhzLoadKeyStateOK,
     SubGhzLoadKeyStateParseErr,
-    SubGhzLoadKeyStateOnlyRx,
-    SubGhzLoadKeyStateUnsuportedFreq,
     SubGhzLoadKeyStateProtocolDescriptionErr,
 } SubGhzLoadKeyState;
 
@@ -78,11 +75,10 @@ typedef enum {
     SubGhzViewIdReceiver,
     SubGhzViewIdPopup,
     SubGhzViewIdTextInput,
-    SubGhzViewIdByteInput,
     SubGhzViewIdWidget,
     SubGhzViewIdTransmitter,
     SubGhzViewIdVariableItemList,
-    SubGhzViewIdFrequencyAnalyzer, // Registered by the analyzer plugin, not by the app
+    SubGhzViewIdFrequencyAnalyzer,
     SubGhzViewIdReadRAW,
 
 } SubGhzViewId;
@@ -93,14 +89,3 @@ typedef enum {
     SubGhzLoadTypeFileKey,
     SubGhzLoadTypeFileRaw,
 } SubGhzLoadTypeFile;
-
-typedef enum {
-    SubGhzViewReceiverModeLive,
-    SubGhzViewReceiverModeFile,
-} SubGhzViewReceiverMode;
-
-typedef enum {
-    SubGhzDecodeRawStateStart,
-    SubGhzDecodeRawStateLoading,
-    SubGhzDecodeRawStateLoaded,
-} SubGhzDecodeRawState;

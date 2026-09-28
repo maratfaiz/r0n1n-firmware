@@ -55,29 +55,28 @@ static void archive_list_load_cb(void* context, uint32_t list_load_offset) {
         false);
 }
 
-static void archive_list_item_cb(
-    void* context,
-    FuriString* item_path,
-    uint32_t idx,
-    bool is_folder,
-    bool is_last) {
+static void
+    archive_list_item_cb(void* context, FuriString* item_path, bool is_folder, bool is_last) {
     furi_assert(context);
-    UNUSED(idx);
     ArchiveBrowserView* browser = (ArchiveBrowserView*)context;
 
     if(!is_last) {
         archive_add_file_item(browser, is_folder, furi_string_get_cstr(item_path));
     } else {
+        bool load_again = false;
         with_view_model(
             browser->view,
             ArchiveBrowserViewModel * model,
             {
-                if(model->item_cnt <= BROWSER_SORT_THRESHOLD) {
-                    files_array_sort(model->files);
-                }
                 model->list_loading = false;
+                if(archive_is_file_list_load_required(model)) {
+                    load_again = true;
+                }
             },
             true);
+        if(load_again) {
+            archive_file_array_load(browser, 0);
+        }
     }
 }
 
@@ -123,6 +122,26 @@ bool archive_is_item_in_array(ArchiveBrowserViewModel* model, uint32_t idx) {
     return true;
 }
 
+bool archive_is_file_list_load_required(ArchiveBrowserViewModel* model) {
+    size_t array_size = files_array_size(model->files);
+
+    if((model->list_loading) || (array_size >= model->item_cnt)) {
+        return false;
+    }
+
+    if((model->array_offset > 0) &&
+       (model->item_idx < (model->array_offset + FILE_LIST_BUF_LEN / 4))) {
+        return true;
+    }
+
+    if(((model->array_offset + array_size) < model->item_cnt) &&
+       (model->item_idx > (int32_t)(model->array_offset + array_size - FILE_LIST_BUF_LEN / 4))) {
+        return true;
+    }
+
+    return false;
+}
+
 void archive_update_offset(ArchiveBrowserView* browser) {
     furi_assert(browser);
 
@@ -151,10 +170,8 @@ void archive_update_focus(ArchiveBrowserView* browser, const char* target) {
 
     archive_get_items(browser, furi_string_get_cstr(browser->path));
 
-    ArchiveTabEnum tab = archive_get_tab(browser);
-    if(!archive_file_get_array_size(browser) && archive_is_home(browser) &&
-       (tab != ArchiveTabBrowser)) {
-        archive_switch_tab(browser, TAB_LEFT);
+    if(!archive_file_get_array_size(browser) && archive_is_home(browser)) {
+        archive_switch_tab(browser, TAB_RIGHT);
     } else {
         with_view_model(
             browser->view,
@@ -220,9 +237,8 @@ void archive_file_array_rm_selected(ArchiveBrowserView* browser) {
         },
         false);
 
-    ArchiveTabEnum tab = archive_get_tab(browser);
-    if((items_cnt == 0) && (archive_is_home(browser)) && (tab != ArchiveTabBrowser)) {
-        archive_switch_tab(browser, TAB_LEFT);
+    if((items_cnt == 0) && (archive_is_home(browser))) {
+        archive_switch_tab(browser, TAB_RIGHT);
     }
 
     archive_update_offset(browser);
@@ -420,12 +436,9 @@ void archive_show_file_menu(ArchiveBrowserView* browser, bool show) {
         ArchiveBrowserViewModel * model,
         {
             if(show) {
-                model->menu = true;
-                model->menu_idx = 0;
-                menu_array_reset(model->context_menu);
                 if(archive_is_item_in_array(model, model->item_idx)) {
-                    model->menu_file_manage = false;
-
+                    model->menu = true;
+                    model->menu_idx = 0;
                     ArchiveFile_t* selected =
                         files_array_get(model->files, model->item_idx - model->array_offset);
                     selected->fav =
@@ -433,10 +446,7 @@ void archive_show_file_menu(ArchiveBrowserView* browser, bool show) {
                 }
             } else {
                 model->menu = false;
-                model->menu_file_manage = false;
                 model->menu_idx = 0;
-                model->menu_can_switch = false;
-                menu_array_reset(model->context_menu);
             }
         },
         true);
@@ -473,13 +483,6 @@ void archive_switch_tab(ArchiveBrowserView* browser, InputKey key) {
         tab = ((tab - 1) + ArchiveTabTotal) % ArchiveTabTotal;
     } else {
         tab = (tab + 1) % ArchiveTabTotal;
-    }
-    if(tab == ArchiveTabInternal && !furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
-        if(key == InputKeyLeft) {
-            tab = ((tab - 1) + ArchiveTabTotal) % ArchiveTabTotal;
-        } else {
-            tab = (tab + 1) % ArchiveTabTotal;
-        }
     }
 
     browser->is_root = true;

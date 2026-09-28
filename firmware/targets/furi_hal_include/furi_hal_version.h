@@ -14,12 +14,10 @@
 extern "C" {
 #endif
 
-#define FURI_HAL_VERSION_NAME_LENGTH        (8)
+#define FURI_HAL_VERSION_NAME_LENGTH        8
 #define FURI_HAL_VERSION_ARRAY_NAME_LENGTH  (FURI_HAL_VERSION_NAME_LENGTH + 1)
-/** 31b BLE Adv - 3b flags - 2b name prefix - 4b service uuid - 3b tx power = 19, + 1b null terminator (not present in packet) */
-#define FURI_HAL_BT_ADV_NAME_LENGTH         (20)
-/** BLE symbol + name */
-#define FURI_HAL_VERSION_DEVICE_NAME_LENGTH (1 + FURI_HAL_BT_ADV_NAME_LENGTH)
+/** BLE symbol + "Flipper " + name */
+#define FURI_HAL_VERSION_DEVICE_NAME_LENGTH (1 + 8 + FURI_HAL_VERSION_ARRAY_NAME_LENGTH)
 
 /** OTP Versions enum */
 typedef enum {
@@ -142,29 +140,17 @@ FuriHalVersionColor furi_hal_version_get_hw_color(void);
  */
 uint8_t furi_hal_version_get_hw_connect(void);
 
-/** Get hardware region (fake) = 0
- *
- * @return     Hardware Region (fake)
- */
-FuriHalVersionRegion furi_hal_version_get_hw_region(void);
-
-/** Get hardware region name (fake) = R00
- *
- * @return     Hardware Region name (fake)
- */
-const char* furi_hal_version_get_hw_region_name(void);
-
-/** Get hardware region (OTP)
+/** Get hardware region
  *
  * @return     Hardware Region
  */
-FuriHalVersionRegion furi_hal_version_get_hw_region_otp(void);
+FuriHalVersionRegion furi_hal_version_get_hw_region(void);
 
-/** Get hardware region name (OTP)
+/** Get hardware region name
  *
  * @return     Hardware Region name
  */
-const char* furi_hal_version_get_hw_region_name_otp(void);
+const char* furi_hal_version_get_hw_region_name(void);
 
 /** Get hardware display id
  *
@@ -196,10 +182,6 @@ const char* furi_hal_version_get_device_name_ptr(void);
  */
 const char* furi_hal_version_get_ble_local_device_name_ptr(void);
 
-/** Set flipper name
- */
-void furi_hal_version_set_name(const char* name);
-
 /** Get BLE MAC address
  *
  * @return     pointer to BLE MAC address
@@ -223,8 +205,6 @@ size_t furi_hal_version_uid_size(void);
  * @return     pointer to UID
  */
 const uint8_t* furi_hal_version_uid(void);
-
-const uint8_t* furi_hal_version_uid_default(void);
 
 #ifdef __cplusplus
 }

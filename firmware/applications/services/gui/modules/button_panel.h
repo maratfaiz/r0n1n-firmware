@@ -35,12 +35,6 @@ void button_panel_free(ButtonPanel* button_panel);
  */
 void button_panel_reset(ButtonPanel* button_panel);
 
-/** Resets selected_item_x and selected_item_y.
- * 
- * @param      button_panel  ButtonPanel instance
- */
-void button_panel_reset_selection(ButtonPanel* button_panel);
-
 /** Reserve space for adding items.
  *
  * One does not simply use button_panel_add_item() without this function. It
@@ -61,7 +55,7 @@ void button_panel_reserve(ButtonPanel* button_panel, size_t reserve_x, size_t re
  * @param      matrix_place_x      coordinates by x-axis on virtual grid, it
  *                                 is only used for navigation
  * @param      matrix_place_y      coordinates by y-axis on virtual grid, it
- *                                 is only used for navigation
+ *                                 is only used for naviagation
  * @param      x                   x-coordinate to draw icon on
  * @param      y                   y-coordinate to draw icon on
  * @param      icon_name           name of the icon to draw

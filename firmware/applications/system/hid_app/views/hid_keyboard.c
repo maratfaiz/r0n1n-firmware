@@ -311,14 +311,14 @@ static void hid_keyboard_draw_callback(Canvas* canvas, void* context) {
     if(!model->connected) {
         canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
         canvas_set_font(canvas, FontPrimary);
-        elements_multiline_text_aligned(canvas, 17, 3, AlignLeft, AlignTop, "Keyboard");
+        elements_multiline_text_aligned(canvas, 17, 3, AlignLeft, AlignTop, "Клавиат.");
 
         canvas_draw_icon(canvas, 68, 3, &I_Pin_back_arrow_10x8);
         canvas_set_font(canvas, FontSecondary);
-        elements_multiline_text_aligned(canvas, 127, 4, AlignRight, AlignTop, "Hold to exit");
+        elements_multiline_text_aligned(canvas, 127, 4, AlignRight, AlignTop, "держи");
 
         elements_multiline_text_aligned(
-            canvas, 4, 60, AlignLeft, AlignBottom, "Waiting for Connection...");
+            canvas, 4, 60, AlignLeft, AlignBottom, "Ожидание подключения...");
         return; // Dont render the keyboard if we are not yet connected
     }
 #endif

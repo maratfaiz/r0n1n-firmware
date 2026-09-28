@@ -2,8 +2,9 @@
 
 ## Current stage of the project
 
-R0N1N is **in active development**: `firmware/` is a real fork of Unleashed
-(brought in via `git subtree`, see `docs/FIRMWARE_LANDSCAPE.md`), and
+R0N1N is **in active development**: `firmware/` is the official Flipper
+Zero firmware (brought in via `git subtree`, see
+`docs/FIRMWARE_LANDSCAPE.md`) with R0N1N's changes on top, and
 Stages 0–1 of `docs/ROADMAP.md` are done — the Home dashboard, Control
 Center, Quick Actions, and Recent all exist and build. See
 `docs/ROADMAP.md`, "Current status," for exactly what's shipped, what's
@@ -47,7 +48,7 @@ supply-chain compromise are declined without discussion.
 
 ## License
 
-The project is distributed under GPL-3.0 (see `LICENSE`) — like Unleashed,
-Momentum, and RogueMaster, whose codebase will become R0N1N's foundation.
-Any code added after development begins must be compatible with this
-license.
+The project is distributed under GPL-3.0 (see `LICENSE`) — the license of
+the official Flipper Zero firmware it is built on. Any code added must be
+compatible with this license, and must be either R0N1N's own or come from
+the official firmware: no code is taken from third-party custom firmwares.

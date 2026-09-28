@@ -3,11 +3,11 @@
 #include <bit_lib/bit_lib.h>
 #include "lfrfid_protocols.h"
 
-#define KERI_PREAMBLE_BIT_SIZE (33)
+#define KERI_PREAMBLE_BIT_SIZE  (33)
+#define KERI_PREAMBLE_DATA_SIZE (5)
 
 #define KERI_ENCODED_BIT_SIZE  (64)
-// Two whole frames, so that the decoder can compare their payloads
-#define KERI_ENCODED_DATA_SIZE (((KERI_ENCODED_BIT_SIZE) * 2) / 8)
+#define KERI_ENCODED_DATA_SIZE (((KERI_ENCODED_BIT_SIZE) / 8) + KERI_PREAMBLE_DATA_SIZE)
 #define KERI_ENCODED_DATA_LAST ((KERI_ENCODED_BIT_SIZE) / 8)
 
 #define KERI_DECODED_BIT_SIZE  (28)
@@ -15,13 +15,6 @@
 
 #define KERI_US_PER_BIT             (255)
 #define KERI_ENCODER_PULSES_PER_BIT (16)
-
-// A Keri frame carries 29 zeros in its preamble, so it is never DC balanced, and
-// the PSK slicer then reports one level long and the other short by ~135 us --
-// past the half bit period KERI_US_PER_BIT rounding tolerates, so every run of
-// ones decodes one bit long. The correction only has to land the residual back
-// inside +/-127 us, so its exact value is not critical.
-#define KERI_EDGE_SKEW_US (120)
 
 typedef struct {
     uint8_t data_index;
@@ -34,10 +27,8 @@ typedef struct {
 typedef struct {
     uint8_t encoded_data[KERI_ENCODED_DATA_SIZE];
     uint8_t negative_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_long_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_long_negative_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_short_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_short_negative_encoded_data[KERI_ENCODED_DATA_SIZE];
+    uint8_t corrupted_encoded_data[KERI_ENCODED_DATA_SIZE];
+    uint8_t corrupted_negative_encoded_data[KERI_ENCODED_DATA_SIZE];
 
     uint8_t data[KERI_DECODED_DATA_SIZE];
     ProtocolKeriEncoder encoder;
@@ -59,10 +50,8 @@ uint8_t* protocol_keri_get_data(ProtocolKeri* protocol) {
 void protocol_keri_decoder_start(ProtocolKeri* protocol) {
     memset(protocol->encoded_data, 0, KERI_ENCODED_DATA_SIZE);
     memset(protocol->negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_long_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_long_negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_short_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_short_negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
+    memset(protocol->corrupted_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
+    memset(protocol->corrupted_negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
 }
 
 static bool protocol_keri_check_preamble(uint8_t* data, size_t bit_index) {
@@ -74,13 +63,9 @@ static bool protocol_keri_check_preamble(uint8_t* data, size_t bit_index) {
 
 static bool protocol_keri_can_be_decoded(uint8_t* data) {
     if(!protocol_keri_check_preamble(data, 0)) return false;
-    if(!protocol_keri_check_preamble(data, KERI_ENCODED_BIT_SIZE)) return false;
-    // Both frames must carry the same ID. Keri has no parity and no checksum, so
-    // frame to frame agreement is the only integrity check available, and a
-    // marginal capture is mis-sliced differently in each frame.
-    if(bit_lib_get_bits_32(data, 32, 32) !=
-       bit_lib_get_bits_32(data, KERI_ENCODED_BIT_SIZE + 32, 32))
-        return false;
+    if(!protocol_keri_check_preamble(data, 64)) return false;
+    ///if(bit_lib_get_bit(data, 61) != 0) return false;
+    //if(bit_lib_get_bit(data, 60) != 0) return false;
     return true;
 }
 
@@ -135,64 +120,50 @@ static void protocol_keri_decoder_save(uint8_t* data_to, const uint8_t* data_fro
     data_to[0] = (uint8_t)(id >>= 8);
 }
 
-// Feed one level/duration into a pair of buffers: one that takes the level as
-// the bit value, one that takes its complement. On success the decoded ID is
-// written to protocol->data.
-static bool protocol_keri_decoder_feed_pair(
-    ProtocolKeri* protocol,
-    bool level,
-    uint32_t duration,
-    uint8_t* positive,
-    uint8_t* negative) {
-    if(protocol_keri_decoder_feed_internal(level, duration, positive)) {
-        protocol_keri_decoder_save(protocol->data, positive);
-        return true;
-    }
-
-    if(protocol_keri_decoder_feed_internal(!level, duration, negative)) {
-        protocol_keri_decoder_save(protocol->data, negative);
-        return true;
-    }
-
-    return false;
-}
-
 bool protocol_keri_decoder_feed(ProtocolKeri* protocol, bool level, uint32_t duration) {
+    bool result = false;
+
     if(duration > (KERI_US_PER_BIT / 2)) {
-        if(protocol_keri_decoder_feed_pair(
-               protocol, level, duration, protocol->encoded_data, protocol->negative_encoded_data)) {
-            return true;
+        if(protocol_keri_decoder_feed_internal(level, duration, protocol->encoded_data)) {
+            protocol_keri_decoder_save(protocol->data, protocol->encoded_data);
+            result = true;
+            return result;
+        }
+
+        if(protocol_keri_decoder_feed_internal(!level, duration, protocol->negative_encoded_data)) {
+            protocol_keri_decoder_save(protocol->data, protocol->negative_encoded_data);
+            result = true;
+            return result;
         }
     }
 
     if(duration > (KERI_US_PER_BIT / 4)) {
-        // Correct the slicer's skew both ways round, the direction real tags
-        // show first. A duration at or below the skew is left as is rather than
-        // clamped to zero: either way it rounds to no bits.
-        const uint32_t shortened =
-            (duration > KERI_EDGE_SKEW_US) ? (duration - KERI_EDGE_SKEW_US) : duration;
-        const uint32_t lengthened = duration + KERI_EDGE_SKEW_US;
-
-        if(protocol_keri_decoder_feed_pair(
-               protocol,
-               level,
-               level ? shortened : lengthened,
-               protocol->high_long_encoded_data,
-               protocol->high_long_negative_encoded_data)) {
-            return true;
+        // Try to decode wrong phase synced data
+        if(level) {
+            duration += 120;
+        } else {
+            if(duration > 120) {
+                duration -= 120;
+            }
         }
 
-        if(protocol_keri_decoder_feed_pair(
-               protocol,
-               level,
-               level ? lengthened : shortened,
-               protocol->high_short_encoded_data,
-               protocol->high_short_negative_encoded_data)) {
-            return true;
+        if(protocol_keri_decoder_feed_internal(level, duration, protocol->corrupted_encoded_data)) {
+            protocol_keri_decoder_save(protocol->data, protocol->corrupted_encoded_data);
+
+            result = true;
+            return result;
+        }
+
+        if(protocol_keri_decoder_feed_internal(
+               !level, duration, protocol->corrupted_negative_encoded_data)) {
+            protocol_keri_decoder_save(protocol->data, protocol->corrupted_negative_encoded_data);
+
+            result = true;
+            return result;
         }
     }
 
-    return false;
+    return result;
 }
 
 bool protocol_keri_encoder_start(ProtocolKeri* protocol) {
@@ -252,17 +223,17 @@ static void
     if(brief) {
         furi_string_printf(
             result,
-            "Internal ID: %lu\n"
-            "FC: %lu; Card: %lu",
+            "Внутр. ID: %lu\n"
+            "FC: %lu; Карта: %lu",
             internal_id,
             fc,
             cn);
     } else {
         furi_string_printf(
             result,
-            "Internal ID: %lu\n"
+            "Внутр. ID: %lu\n"
             "FC: %lu\n"
-            "Card: %lu",
+            "Карта: %lu",
             internal_id,
             fc,
             cn);

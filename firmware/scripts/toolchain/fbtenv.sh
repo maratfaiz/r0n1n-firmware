@@ -149,12 +149,7 @@ fbtenv_get_kernel_type()
         return 1;
     fi
     TOOLCHAIN_ARCH_DIR="$FBT_TOOLCHAIN_PATH/toolchain/$ARCH_TYPE-$SYS_TYPE";
-    if [ -z "${FBT_TOOLS_CUSTOM_LINK:-}" ]; then
-        TOOLCHAIN_URL="https://update.flipperzero.one/builds/toolchain/gcc-arm-none-eabi-12.3-$ARCH_TYPE-$SYS_TYPE-flipper-$FBT_TOOLCHAIN_VERSION.tar.gz";
-    else
-        echo "info: custom toolchain link is used";
-        TOOLCHAIN_URL=$FBT_TOOLS_CUSTOM_LINK;
-    fi
+    TOOLCHAIN_URL="https://update.flipperzero.one/builds/toolchain/gcc-arm-none-eabi-12.3-$ARCH_TYPE-$SYS_TYPE-flipper-$FBT_TOOLCHAIN_VERSION.tar.gz";
     return 0;
 }
 

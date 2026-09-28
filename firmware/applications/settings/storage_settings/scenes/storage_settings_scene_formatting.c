@@ -33,7 +33,7 @@ void storage_settings_scene_formatting_on_enter(void* context) {
     FS_Error error;
     DialogEx* dialog_ex = app->dialog_ex;
 
-    dialog_ex_set_header(dialog_ex, "Formatting...", 70, 32, AlignCenter, AlignCenter);
+    dialog_ex_set_header(dialog_ex, "Форматирование...", 70, 32, AlignCenter, AlignCenter);
     dialog_ex_set_icon(dialog_ex, 15, 20, &I_LoadingHourglass_24x24);
     view_dispatcher_switch_to_view(app->view_dispatcher, StorageSettingsViewDialogEx);
 
@@ -46,20 +46,20 @@ void storage_settings_scene_formatting_on_enter(void* context) {
     dialog_ex_set_result_callback(dialog_ex, storage_settings_scene_formatting_dialog_callback);
 
     if(error != FSE_OK) {
-        dialog_ex_set_header(dialog_ex, "Cannot Format SD Card", 64, 10, AlignCenter, AlignCenter);
+        dialog_ex_set_header(dialog_ex, "Сбой форматирования", 64, 10, AlignCenter, AlignCenter);
         dialog_ex_set_icon(dialog_ex, 0, 0, NULL);
         dialog_ex_set_text(
             dialog_ex, storage_error_get_desc(error), 64, 32, AlignCenter, AlignCenter);
     } else {
         dialog_ex_set_icon(dialog_ex, 48, 6, &I_DolphinDone_80x58);
-        dialog_ex_set_header(dialog_ex, "Formatted", 5, 10, AlignLeft, AlignTop);
+        dialog_ex_set_header(dialog_ex, "Отформатировано", 5, 10, AlignLeft, AlignTop);
         NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
         notification_message(notification, &sequence_single_vibro);
         notification_message(notification, &sequence_set_green_255);
         notification_message(notification, &sequence_success);
         furi_record_close(RECORD_NOTIFICATION);
     }
-    dialog_ex_set_left_button_text(dialog_ex, "Finish");
+    dialog_ex_set_left_button_text(dialog_ex, "Готово");
 }
 
 bool storage_settings_scene_formatting_on_event(void* context, SceneManagerEvent event) {
@@ -69,14 +69,8 @@ bool storage_settings_scene_formatting_on_event(void* context, SceneManagerEvent
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
         case DialogExResultLeft:
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_search_and_switch_to_previous_scene(
-                    app->scene_manager, StorageSettingsStart);
-            }
+            consumed = scene_manager_search_and_switch_to_previous_scene(
+                app->scene_manager, StorageSettingsStart);
             break;
         }
     } else if(event.type == SceneManagerEventTypeBack) {

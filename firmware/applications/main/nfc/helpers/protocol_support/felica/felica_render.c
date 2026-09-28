@@ -5,10 +5,11 @@ void nfc_render_felica_blocks_count(
     FuriString* str,
     bool render_auth_notification) {
     if(data->workflow_type == FelicaLite) {
-        furi_string_cat_printf(str, "Blocks: %u\n", data->blocks_total);
-        furi_string_cat_printf(str, "\nBlocks Read: %u/%u", data->blocks_read, data->blocks_total);
+        furi_string_cat_printf(str, "Блоков: %u\n", data->blocks_total);
+        furi_string_cat_printf(
+            str, "\nБлоков прочитано: %u/%u", data->blocks_read, data->blocks_total);
         if(render_auth_notification && data->blocks_read != data->blocks_total) {
-            furi_string_cat_printf(str, "\nAuth-protected blocks!");
+            furi_string_cat_printf(str, "\nБлоки под защитой!");
         }
     }
 }
@@ -32,12 +33,12 @@ void nfc_render_felica_info(
     NfcProtocolFormatType format_type,
     FuriString* str) {
     if(format_type == NfcProtocolFormatTypeFull) {
-        furi_string_cat_printf(str, "Tech: JIS X 6319-4,\nISO 18092 [NFC-F]\n");
+        furi_string_cat_printf(str, "Тип: JIS X 6319-4,\nISO 18092 [NFC-F]\n");
     }
 
     FuriString* ic_type_str = furi_string_alloc();
     felica_get_ic_name(data, ic_type_str);
-    furi_string_cat_printf(str, "IC Type:\n%s\n", furi_string_get_cstr(ic_type_str));
+    furi_string_cat_printf(str, "Тип чипа:\n%s\n", furi_string_get_cstr(ic_type_str));
     furi_string_free(ic_type_str);
 
     nfc_render_felica_idm(data, format_type, str);
@@ -50,7 +51,7 @@ void nfc_render_felica_info(
     }
 
     furi_string_cat_printf(str, "\n");
-    furi_string_cat_printf(str, "Systems found: %lu \n", simple_array_get_count(data->systems));
+    furi_string_cat_printf(str, "Найдено систем: %lu \n", simple_array_get_count(data->systems));
 
     nfc_render_felica_blocks_count(data, str, true);
 }
@@ -96,9 +97,9 @@ static void nfc_render_felica_block(
 void nfc_more_info_render_felica_lite_dump(const FelicaData* data, FuriString* str) {
     FuriString* name = furi_string_alloc();
 
-    furi_string_cat_printf(str, "\e#Blocks read:\n");
+    furi_string_cat_printf(str, "\e#Прочитано блоков:\n");
 
-    furi_string_cat_printf(str, "Blocks: %u\n", data->blocks_total);
+    furi_string_cat_printf(str, "Блоков: %u\n", data->blocks_total);
 
     for(size_t i = 0; i < 14; i++) {
         furi_string_printf(name, "S_PAD%d", i);
@@ -132,15 +133,14 @@ void nfc_more_info_render_felica_dir(const FelicaSystem* system, FuriString* str
     const size_t area_count = simple_array_get_count(system->areas);
     const size_t service_count = simple_array_get_count(system->services);
 
-    furi_string_cat_printf(str, "\e#Directory Tree:\n");
+    furi_string_cat_printf(str, "\e#Дерево каталогов:\n");
 
     if(area_count == 0 || service_count == 0) {
-        furi_string_cat_printf(str, "No services or areas found.\n");
+        furi_string_cat_printf(str, "Сервисы и области не найдены.\n");
     } else {
         furi_string_cat_printf(
-            str, "%zu areas found.\n%zu services found.\n\n", area_count, service_count);
-        furi_string_cat_printf(
-            str, "::: ... are readable services\n||| ... are locked services\n");
+            str, "Областей: %zu.\nСервисов: %zu.\n\n", area_count, service_count);
+        furi_string_cat_printf(str, "::: ... читаемые сервисы\n||| ... закрытые сервисы\n");
     }
     felica_write_directory_tree(system, str);
 }
@@ -152,7 +152,7 @@ void nfc_more_info_render_felica_blocks(
     const uint16_t service_code_key) {
     furi_string_cat_printf(str, "\n");
     if(data->workflow_type == FelicaLite) {
-        furi_string_cat_printf(str, "Blocks: %u\n", data->blocks_total);
+        furi_string_cat_printf(str, "Блоков: %u\n", data->blocks_total);
         FuriString* name = furi_string_alloc();
 
         for(size_t i = 0; i < 14; i++) {
@@ -189,7 +189,7 @@ void nfc_more_info_render_felica_blocks(
             if(public_block->service_code != service_code_key) {
                 continue; // Skip blocks not matching the requested service code
             }
-            furi_string_cat_printf(str, "-----Block 0x%02X-----\n", public_block->block_idx);
+            furi_string_cat_printf(str, "-----Блок 0x%02X-----\n", public_block->block_idx);
             nfc_render_felica_block_data_simple(&public_block->block, str);
             furi_string_cat_printf(str, "\n");
         }

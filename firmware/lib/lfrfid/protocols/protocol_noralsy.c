@@ -180,8 +180,8 @@ static void protocol_noralsy_render_data_internal(ProtocolNoralsy* protocol, Fur
     bool tag_is_gen_z = (year > 0x60);
     furi_string_printf(
         result,
-        "Card ID: %07lx\n"
-        "Year: %s%02x",
+        "ID карты: %07lx\n"
+        "Год: %s%02x",
         cardid,
         tag_is_gen_z ? "19" : "20",
         year);

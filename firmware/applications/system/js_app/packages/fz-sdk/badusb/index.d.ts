@@ -38,9 +38,6 @@ export type KeyCode = MainKey | ModifierKey | number;
 
 /**
  * @brief Initializes the module
- * 
- * Automatically unlocks USB profile, so qFlipper connection will be interrupted.
- * 
  * @param settings USB device settings. Omit to select default parameters
  * @version Added in JS SDK 0.1
  */

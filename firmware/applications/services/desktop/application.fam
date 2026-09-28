@@ -12,7 +12,7 @@ App(
     ],
     provides=["desktop_settings"],
     conflicts=["updater"],
-    stack_size=2 * 1024,
+    # R0N1N: the shell scenes scan the SD card (Captures, Search, Hub) on this thread.
+    stack_size=3 * 1024,
     order=60,
-    sdk_headers=["desktop_settings.h", "desktop.h"],
 )

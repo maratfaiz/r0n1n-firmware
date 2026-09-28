@@ -77,7 +77,7 @@ static bool
 static void storage_settings_scene_benchmark(StorageSettings* app) {
     DialogEx* dialog_ex = app->dialog_ex;
     uint8_t* bench_data;
-    dialog_ex_set_header(dialog_ex, "Preparing Data...", 64, 32, AlignCenter, AlignCenter);
+    dialog_ex_set_header(dialog_ex, "Подготовка...", 64, 32, AlignCenter, AlignCenter);
 
     bench_data = malloc(BENCH_DATA_SIZE);
     for(size_t i = 0; i < BENCH_DATA_SIZE; i++) {
@@ -88,7 +88,7 @@ static void storage_settings_scene_benchmark(StorageSettings* app) {
     uint32_t bench_w_speed[BENCH_COUNT] = {0, 0, 0, 0, 0, 0};
     uint32_t bench_r_speed[BENCH_COUNT] = {0, 0, 0, 0, 0, 0};
 
-    dialog_ex_set_header(dialog_ex, "Benchmarking...", 74, 32, AlignCenter, AlignCenter);
+    dialog_ex_set_header(dialog_ex, "Тестирование...", 74, 32, AlignCenter, AlignCenter);
     dialog_ex_set_icon(dialog_ex, 12, 20, &I_LoadingHourglass_24x24);
     for(size_t i = 0; i < BENCH_COUNT; i++) {
         if(!storage_settings_scene_bench_write(
@@ -96,7 +96,7 @@ static void storage_settings_scene_benchmark(StorageSettings* app) {
             break;
 
         if(i > 0) furi_string_cat_printf(app->text_string, "\n");
-        furi_string_cat_printf(app->text_string, "%ub : W %luK ", bench_size[i], bench_w_speed[i]);
+        furi_string_cat_printf(app->text_string, "%ub : З %luK ", bench_size[i], bench_w_speed[i]);
         dialog_ex_set_header(dialog_ex, NULL, 0, 0, AlignCenter, AlignCenter);
         dialog_ex_set_icon(dialog_ex, 0, 0, NULL);
         dialog_ex_set_text(
@@ -106,7 +106,7 @@ static void storage_settings_scene_benchmark(StorageSettings* app) {
                app->fs_api, bench_size[i], bench_data, &bench_r_speed[i]))
             break;
 
-        furi_string_cat_printf(app->text_string, "R %luK", bench_r_speed[i]);
+        furi_string_cat_printf(app->text_string, "Ч %luK", bench_r_speed[i]);
 
         storage_common_remove(app->fs_api, BENCH_FILE);
 
@@ -136,10 +136,10 @@ void storage_settings_scene_benchmark_on_enter(void* context) {
 
     if(sd_status != FSE_OK) {
         dialog_ex_set_icon(dialog_ex, 83, 22, &I_WarningDolphinFlip_45x42);
-        dialog_ex_set_header(dialog_ex, "SD Card Not Mounted", 64, 3, AlignCenter, AlignTop);
+        dialog_ex_set_header(dialog_ex, "Нет SD-карты", 64, 3, AlignCenter, AlignTop);
         dialog_ex_set_text(
-            dialog_ex, "Try to reinsert\nor format SD\ncard.", 3, 19, AlignLeft, AlignTop);
-        dialog_ex_set_center_button_text(dialog_ex, "Ok");
+            dialog_ex, "Вставьте заново\nили отформатируйте\nкарту.", 3, 19, AlignLeft, AlignTop);
+        dialog_ex_set_center_button_text(dialog_ex, "OK");
     } else {
         storage_settings_scene_benchmark(app);
         notification_message(app->notification, &sequence_blink_green_100);
@@ -156,26 +156,14 @@ bool storage_settings_scene_benchmark_on_event(void* context, SceneManagerEvent 
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
         case DialogExResultCenter:
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_search_and_switch_to_previous_scene(
-                    app->scene_manager, StorageSettingsStart);
-            }
+            consumed = scene_manager_search_and_switch_to_previous_scene(
+                app->scene_manager, StorageSettingsStart);
             break;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
         if(sd_status == FSE_OK) {
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_search_and_switch_to_previous_scene(
-                    app->scene_manager, StorageSettingsStart);
-            }
+            consumed = scene_manager_search_and_switch_to_previous_scene(
+                app->scene_manager, StorageSettingsStart);
         } else {
             consumed = true;
         }

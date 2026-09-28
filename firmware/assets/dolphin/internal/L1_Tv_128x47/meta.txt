@@ -11,22 +11,4 @@ Frame rate: 2
 Duration: 3600
 Active cooldown: 5
 
-Bubble slots: 2
-
-Slot: 0
-X: 1
-Y: 23
-Text: Take the red pill
-AlignH: Right
-AlignV: Bottom
-StartFrame: 7
-EndFrame: 9
-
-Slot: 1
-X: 1
-Y: 23
-Text: I can joke better
-AlignH: Right
-AlignV: Bottom
-StartFrame: 7
-EndFrame: 9
+Bubble slots: 0

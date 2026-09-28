@@ -21,37 +21,37 @@ void infrared_scene_edit_on_enter(void* context) {
 
     submenu_add_item(
         submenu,
-        "Add Button",
+        "Добавить кнопку",
         SubmenuIndexAddButton,
         infrared_scene_edit_submenu_callback,
         context);
     submenu_add_item(
         submenu,
-        "Rename Button",
+        "Переименовать кнопку",
         SubmenuIndexRenameButton,
         infrared_scene_edit_submenu_callback,
         context);
     submenu_add_item(
         submenu,
-        "Move Button",
+        "Переместить кнопку",
         SubmenuIndexMoveButton,
         infrared_scene_edit_submenu_callback,
         context);
     submenu_add_item(
         submenu,
-        "Delete Button",
+        "Удалить кнопку",
         SubmenuIndexDeleteButton,
         infrared_scene_edit_submenu_callback,
         context);
     submenu_add_item(
         submenu,
-        "Rename Remote",
+        "Переименовать пульт",
         SubmenuIndexRenameRemote,
         infrared_scene_edit_submenu_callback,
         context);
     submenu_add_item(
         submenu,
-        "Delete Remote",
+        "Удалить пульт",
         SubmenuIndexDeleteRemote,
         infrared_scene_edit_submenu_callback,
         context);

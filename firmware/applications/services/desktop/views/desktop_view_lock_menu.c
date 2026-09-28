@@ -6,8 +6,7 @@
 #include "desktop_view_lock_menu.h"
 
 typedef enum {
-    //DesktopLockMenuIndexLock,
-    DesktopLockMenuIndexBt,
+    DesktopLockMenuIndexLock,
     DesktopLockMenuIndexStealth,
     DesktopLockMenuIndexDummy,
 
@@ -40,11 +39,6 @@ void desktop_lock_menu_set_stealth_mode_state(DesktopLockMenuView* lock_menu, bo
         true);
 }
 
-void desktop_lock_menu_set_bt_mode_state(DesktopLockMenuView* lock_menu, bool bt_mode) {
-    with_view_model(
-        lock_menu->view, DesktopLockMenuViewModel * model, { model->bt_mode = bt_mode; }, true);
-}
-
 void desktop_lock_menu_set_idx(DesktopLockMenuView* lock_menu, uint8_t idx) {
     furi_assert(idx < DesktopLockMenuIndexTotalCount);
     with_view_model(
@@ -62,24 +56,19 @@ void desktop_lock_menu_draw_callback(Canvas* canvas, void* model) {
     for(size_t i = 0; i < DesktopLockMenuIndexTotalCount; ++i) {
         const char* str = NULL;
 
-        //if(i == DesktopLockMenuIndexLock) {
-        if(i == DesktopLockMenuIndexBt) {
-            if(m->bt_mode) {
-                str = "Turn Bluetooth Off";
-            } else {
-                str = "Turn Bluetooth On";
-            }
+        if(i == DesktopLockMenuIndexLock) {
+            str = "Заблокировать";
         } else if(i == DesktopLockMenuIndexStealth) {
             if(m->stealth_mode) {
-                str = "Unmute";
+                str = "Включить звук";
             } else {
-                str = "Mute";
+                str = "Выключить звук";
             }
         } else if(i == DesktopLockMenuIndexDummy) { //-V547
             if(m->dummy_mode) {
-                str = "Default Mode";
+                str = "Обычный режим";
             } else {
-                str = "Dummy Mode";
+                str = "Режим Dummy";
             }
         }
 
@@ -137,15 +126,10 @@ bool desktop_lock_menu_input_callback(InputEvent* event, void* context) {
         update);
 
     if(event->key == InputKeyOk) {
-        if(idx == DesktopLockMenuIndexBt) {
+        if(idx == DesktopLockMenuIndexLock) {
             if(event->type == InputTypeShort) {
-                lock_menu->callback(DesktopLockMenuEventBt, lock_menu->context);
+                lock_menu->callback(DesktopLockMenuEventLock, lock_menu->context);
             }
-            // old use case
-            // } else if(idx == DesktopLockMenuIndexLock) {
-            //     if(event->type == InputTypeShort) {
-            //         lock_menu->callback(DesktopLockMenuEventLock, lock_menu->context);
-            //     }
         } else if(idx == DesktopLockMenuIndexStealth) {
             if((stealth_mode == false) && (event->type == InputTypeShort)) {
                 lock_menu->callback(DesktopLockMenuEventStealthModeOn, lock_menu->context);
@@ -158,14 +142,6 @@ bool desktop_lock_menu_input_callback(InputEvent* event, void* context) {
             } else if((dummy_mode == true) && (event->type == InputTypeShort)) {
                 lock_menu->callback(DesktopLockMenuEventDummyModeOff, lock_menu->context);
             }
-        }
-        consumed = true;
-    }
-
-    if((event->key == InputKeyLeft) || (event->key == InputKeyRight)) {
-        // Sideways is the second page of this menu: brightness, volume and vibro.
-        if(event->type == InputTypeShort) {
-            lock_menu->callback(DesktopLockMenuEventOpenQuickSettings, lock_menu->context);
         }
         consumed = true;
     }

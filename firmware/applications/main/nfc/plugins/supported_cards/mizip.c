@@ -1,11 +1,8 @@
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
-
+#include <flipper_application/flipper_application.h>
+#include <nfc/nfc_device.h>
+#include <bit_lib/bit_lib.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
-
-#include <bit_lib.h>
-
-#include "mf_classic_parser_util.h"
 
 #define TAG "MiZIP"
 
@@ -169,14 +166,14 @@ static bool mizip_read(Nfc* nfc, NfcDevice* device) {
         }
 
         error = mf_classic_poller_sync_read(nfc, &keys, data);
-        if(error == MfClassicErrorNotPresent) {
+        if(error != MfClassicErrorNone) {
             FURI_LOG_W(TAG, "Failed to read data");
             break;
         }
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        is_read = (error == MfClassicErrorNone);
+        is_read = mf_classic_is_card_read(data);
     } while(false);
 
     mf_classic_free(data);
@@ -201,43 +198,23 @@ static bool mizip_parse(const NfcDevice* device, FuriString* parsed_data) {
         MfClassicSectorTrailer* sec_tr =
             mf_classic_get_sector_trailer_by_sector(data, cfg.verify_sector);
         uint64_t key = bit_lib_bytes_to_num_be(sec_tr->key_b.data, 6);
-        if(key != cfg.keys[cfg.verify_sector].b) break;
+        if(key != cfg.keys[cfg.verify_sector].b) return false;
 
         //Get UID
         uint8_t uid[UID_LENGTH];
         memcpy(uid, data->iso14443_3a_data->uid, UID_LENGTH);
 
         //Get credit
-        // block 10 picks which of blocks 8 and 9 is current, so without it neither can be
-        // named - two real numbers we cannot label are worse than none
         uint8_t credit_pointer = 0x08;
-        uint8_t previous_credit_pointer = 0x09;
-        const bool pointer_read = mf_classic_parser_block_has_data(data, 10);
-        if(!pointer_read) FURI_LOG_D(TAG, "Credit selector block 10 holds no data");
-        if(pointer_read && data->block[10].data[0] == 0x55) {
+        uint8_t previus_credit_pointer = 0x09;
+        if(data->block[10].data[0] == 0x55) {
             credit_pointer = 0x09;
-            previous_credit_pointer = 0x08;
+            previus_credit_pointer = 0x08;
         }
         uint16_t balance = (data->block[credit_pointer].data[2] << 8) |
                            (data->block[credit_pointer].data[1]);
-        uint16_t previous_balance = (data->block[previous_credit_pointer].data[2] << 8) |
-                                    (data->block[previous_credit_pointer].data[1]);
-
-        const bool credit_read = pointer_read &&
-                                 mf_classic_parser_block_has_data(data, credit_pointer);
-        const bool previous_credit_read =
-            pointer_read && mf_classic_parser_block_has_data(data, previous_credit_pointer);
-        if(pointer_read && !credit_read)
-            FURI_LOG_D(TAG, "Credit block %u holds no data", credit_pointer);
-        if(pointer_read && !previous_credit_read)
-            FURI_LOG_D(TAG, "Previous credit block %u holds no data", previous_credit_pointer);
-
-        // the UID is already on the card info screen, so with neither credit there is
-        // nothing left worth replacing the Sectors Read view with
-        if(!credit_read && !previous_credit_read) {
-            FURI_LOG_D(TAG, "Neither credit block holds data");
-            break;
-        }
+        uint16_t previus_balance = (data->block[previus_credit_pointer].data[2] << 8) |
+                                   (data->block[previus_credit_pointer].data[1]);
 
         //parse data
         furi_string_cat_printf(parsed_data, "\e#MiZIP Card\n");
@@ -245,21 +222,13 @@ static bool mizip_parse(const NfcDevice* device, FuriString* parsed_data) {
         for(size_t i = 0; i < UID_LENGTH; i++) {
             furi_string_cat_printf(parsed_data, " %02X", uid[i]);
         }
-        if(credit_read) {
-            furi_string_cat_printf(
-                parsed_data, "\nCurrent Credit: %d.%02d E \n", balance / 100, balance % 100);
-        } else {
-            furi_string_cat(parsed_data, "\nCurrent Credit: Unknown\n");
-        }
-        if(previous_credit_read) {
-            furi_string_cat_printf(
-                parsed_data,
-                "Previous Credit: %d.%02d E \n",
-                previous_balance / 100,
-                previous_balance % 100);
-        } else {
-            furi_string_cat(parsed_data, "Previous Credit: Unknown\n");
-        }
+        furi_string_cat_printf(
+            parsed_data, "\nCurrent Credit: %d.%02d E \n", balance / 100, balance % 100);
+        furi_string_cat_printf(
+            parsed_data,
+            "Previus Credit: %d.%02d E \n",
+            previus_balance / 100,
+            previus_balance % 100);
 
         parsed = true;
     } while(false);

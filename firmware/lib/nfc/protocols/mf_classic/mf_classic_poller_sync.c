@@ -504,24 +504,18 @@ MfClassicError mf_classic_poller_sync_detect_type(Nfc* nfc, MfClassicType* type)
 
     MfClassicError error = MfClassicErrorNone;
 
-    // Probe a block unique to each size, largest first (block 0 is the always-present Mini fallback).
-    // 2K is intentionally absent: block presence can't separate a Plus 2K SL1 from a magic 1K that
-    // answers every block, so this path reports only Mini/1K/4K -- a genuine 2K is ATS-sized in the
-    // read poller (mf_classic_poller_handler_detect_type).
-    static const struct {
-        uint8_t verify_block;
-        MfClassicType type;
-    } mf_classic_verify[] = {
-        {254, MfClassicType4k},
-        {62, MfClassicType1k},
-        {0, MfClassicTypeMini},
+    const uint8_t mf_classic_verify_block[MfClassicTypeNum] = {
+        [MfClassicTypeMini] = 0,
+        [MfClassicType1k] = 62,
+        [MfClassicType4k] = 254,
     };
 
-    for(size_t i = 0; i < COUNT_OF(mf_classic_verify); i++) {
+    size_t i = 0;
+    for(i = 0; i < COUNT_OF(mf_classic_verify_block); i++) {
         error = mf_classic_poller_sync_collect_nt(
-            nfc, mf_classic_verify[i].verify_block, MfClassicKeyTypeA, NULL);
+            nfc, mf_classic_verify_block[MfClassicTypeNum - i - 1], MfClassicKeyTypeA, NULL);
         if(error == MfClassicErrorNone) {
-            *type = mf_classic_verify[i].type;
+            *type = MfClassicTypeNum - i - 1;
             break;
         }
     }

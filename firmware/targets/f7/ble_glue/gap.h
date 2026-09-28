@@ -53,7 +53,6 @@ typedef enum {
     GapPairingNone,
     GapPairingPinCodeShow,
     GapPairingPinCodeVerifyYesNo,
-    GapPairingCount,
 } GapPairing;
 
 typedef struct {

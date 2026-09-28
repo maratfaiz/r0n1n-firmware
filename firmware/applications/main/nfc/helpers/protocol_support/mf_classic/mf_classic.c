@@ -1,5 +1,4 @@
 #include "mf_classic.h"
-#include "mf_classic_extra_scenes.h"
 #include "mf_classic_render.h"
 
 #include <nfc/protocols/mf_classic/mf_classic_poller.h>
@@ -13,34 +12,11 @@
 
 enum {
     SubmenuIndexDetectReader = SubmenuIndexCommonMax,
+    SubmenuIndexWrite,
+    SubmenuIndexUpdate,
     SubmenuIndexDictAttack,
     SubmenuIndexCrackNonces,
-    SubmenuIndexUpdate,
-    SubmenuIndexShowKeys,
-    SubmenuIndexSaveKeys,
 };
-
-// The keys the card gave up are only reachable from this card until they reach the shared user
-// dictionary - the CUID dictionary in particular is per-UID and invisible to everything else.
-static void nfc_scene_menu_add_save_keys_mf_classic(NfcApp* instance, const MfClassicData* data) {
-    if((data->key_a_mask | data->key_b_mask) == 0) return;
-
-    submenu_add_item(
-        instance->submenu,
-        "Save Keys to Dictionary",
-        SubmenuIndexSaveKeys,
-        nfc_protocol_support_common_submenu_callback,
-        instance);
-}
-
-static bool nfc_scene_menu_on_event_save_keys_mf_classic(NfcApp* instance, uint32_t event) {
-    if(event != SubmenuIndexSaveKeys) return false;
-
-    instance->key_dict_type = NfcKeyDictTypeMfClassic;
-    scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDictImport);
-
-    return true;
-}
 
 static void nfc_scene_info_on_enter_mf_classic(NfcApp* instance) {
     const NfcDevice* device = instance->nfc_device;
@@ -139,40 +115,28 @@ static void nfc_scene_read_menu_on_enter_mf_classic(NfcApp* instance) {
     Submenu* submenu = instance->submenu;
     const MfClassicData* data = nfc_device_get_data(instance->nfc_device, NfcProtocolMfClassic);
 
-    // Doesn't make sense to show "Write to Initial Card" right after reading
-    submenu_remove_item(submenu, SubmenuIndexCommonWrite);
-
     if(!mf_classic_is_card_read(data)) {
         submenu_add_item(
             submenu,
-            "Extract MFC Keys",
+            "Извлечь ключи MF",
             SubmenuIndexDetectReader,
             nfc_protocol_support_common_submenu_callback,
             instance);
 
         submenu_add_item(
             submenu,
-            "Unlock with Dictionary",
+            "Подбор по словарю",
             SubmenuIndexDictAttack,
             nfc_protocol_support_common_submenu_callback,
             instance);
 
         submenu_add_item(
             submenu,
-            "Crack nonces in MFKey32",
+            "Взлом nonce в MFKey32",
             SubmenuIndexCrackNonces,
             nfc_protocol_support_common_submenu_callback,
             instance);
     }
-
-    submenu_add_item(
-        submenu,
-        "Show Keys",
-        SubmenuIndexShowKeys,
-        nfc_protocol_support_common_submenu_callback,
-        instance);
-
-    nfc_scene_menu_add_save_keys_mf_classic(instance, data);
 }
 
 static void nfc_scene_read_success_on_enter_mf_classic(NfcApp* instance) { //-V524
@@ -196,39 +160,34 @@ static void nfc_scene_saved_menu_on_enter_mf_classic(NfcApp* instance) {
     Submenu* submenu = instance->submenu;
     const MfClassicData* data = nfc_device_get_data(instance->nfc_device, NfcProtocolMfClassic);
 
-    submenu_change_item_label(submenu, SubmenuIndexCommonWrite, "Write to Initial Card");
-
     if(!mf_classic_is_card_read(data)) {
         submenu_add_item(
             submenu,
-            "Extract MFC Keys",
+            "Извлечь ключи MF",
             SubmenuIndexDetectReader,
             nfc_protocol_support_common_submenu_callback,
             instance);
 
         submenu_add_item(
             submenu,
-            "Unlock with Dictionary",
+            "Подбор по словарю",
             SubmenuIndexDictAttack,
             nfc_protocol_support_common_submenu_callback,
             instance);
     }
+    submenu_add_item(
+        submenu,
+        "Записать на исходную",
+        SubmenuIndexWrite,
+        nfc_protocol_support_common_submenu_callback,
+        instance);
 
     submenu_add_item(
         submenu,
-        "Update from Initial Card",
+        "Обновить с исходной",
         SubmenuIndexUpdate,
         nfc_protocol_support_common_submenu_callback,
         instance);
-
-    submenu_add_item(
-        submenu,
-        "Show Keys",
-        SubmenuIndexShowKeys,
-        nfc_protocol_support_common_submenu_callback,
-        instance);
-
-    nfc_scene_menu_add_save_keys_mf_classic(instance, data);
 }
 
 static void nfc_scene_emulate_on_enter_mf_classic(NfcApp* instance) {
@@ -256,16 +215,14 @@ static bool nfc_scene_read_menu_on_event_mf_classic(NfcApp* instance, SceneManag
                 scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicDictAttack);
             }
             consumed = true;
+        } else if(event.event == SubmenuIndexCommonEdit) {
+            scene_manager_next_scene(instance->scene_manager, NfcSceneSetUid);
+            consumed = true;
         } else if(event.event == SubmenuIndexCrackNonces) {
             scene_manager_set_scene_state(
                 instance->scene_manager, NfcSceneSaveConfirm, NfcSceneSaveConfirmStateCrackNonces);
             scene_manager_next_scene(instance->scene_manager, NfcSceneSaveConfirm);
             consumed = true;
-        } else if(event.event == SubmenuIndexShowKeys) {
-            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicShowKeys);
-            consumed = true;
-        } else {
-            consumed = nfc_scene_menu_on_event_save_keys_mf_classic(instance, event.event);
         }
     }
 
@@ -279,20 +236,18 @@ static bool nfc_scene_saved_menu_on_event_mf_classic(NfcApp* instance, SceneMana
         if(event.event == SubmenuIndexDetectReader) {
             scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicDetectReader);
             consumed = true;
+        } else if(event.event == SubmenuIndexWrite) {
+            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicWriteInitial);
+            consumed = true;
+        } else if(event.event == SubmenuIndexUpdate) {
+            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicUpdateInitial);
+            consumed = true;
         } else if(event.event == SubmenuIndexDictAttack) {
             if(!scene_manager_search_and_switch_to_previous_scene(
                    instance->scene_manager, NfcSceneMfClassicDictAttack)) {
                 scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicDictAttack);
             }
             consumed = true;
-        } else if(event.event == SubmenuIndexUpdate) {
-            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicUpdateInitial);
-            consumed = true;
-        } else if(event.event == SubmenuIndexShowKeys) {
-            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicShowKeys);
-            consumed = true;
-        } else {
-            consumed = nfc_scene_menu_on_event_save_keys_mf_classic(instance, event.event);
         }
     }
 
@@ -312,71 +267,8 @@ static bool nfc_scene_save_name_on_event_mf_classic(NfcApp* instance, SceneManag
     return consumed;
 }
 
-static NfcCommand
-    nfc_scene_write_poller_callback_mf_classic(NfcGenericEvent event, void* context) {
-    furi_assert(event.protocol == NfcProtocolMfClassic);
-
-    NfcApp* instance = context;
-    MfClassicPollerEvent* mfc_event = event.event_data;
-    NfcCommand command = NfcCommandContinue;
-    const MfClassicData* write_data =
-        nfc_device_get_data(instance->nfc_device, NfcProtocolMfClassic);
-
-    if(mfc_event->type == MfClassicPollerEventTypeCardDetected) {
-        furi_string_reset(instance->text_box_store);
-        view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventCardDetected);
-    } else if(mfc_event->type == MfClassicPollerEventTypeCardLost) {
-        furi_string_set(instance->text_box_store, "Use the source\ncard only");
-        view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventCardLost);
-    } else if(mfc_event->type == MfClassicPollerEventTypeRequestMode) {
-        const MfClassicData* tag_data = nfc_poller_get_data(instance->poller);
-        if(iso14443_3a_is_equal(tag_data->iso14443_3a_data, write_data->iso14443_3a_data)) {
-            mfc_event->data->poller_mode.mode = MfClassicPollerModeWrite;
-        } else {
-            furi_string_set(
-                instance->text_box_store, "Use source card!\nTo write blanks\nuse NFC Magic app");
-            view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventWrongCard);
-            command = NfcCommandStop;
-        }
-    } else if(mfc_event->type == MfClassicPollerEventTypeRequestSectorTrailer) {
-        uint8_t sector = mfc_event->data->sec_tr_data.sector_num;
-        uint8_t sec_tr = mf_classic_get_sector_trailer_num_by_sector(sector);
-        if(mf_classic_is_block_read(write_data, sec_tr)) {
-            mfc_event->data->sec_tr_data.sector_trailer = write_data->block[sec_tr];
-            mfc_event->data->sec_tr_data.sector_trailer_provided = true;
-        } else {
-            mfc_event->data->sec_tr_data.sector_trailer_provided = false;
-        }
-    } else if(mfc_event->type == MfClassicPollerEventTypeRequestWriteBlock) {
-        uint8_t block_num = mfc_event->data->write_block_data.block_num;
-        if(mf_classic_is_block_read(write_data, block_num)) {
-            mfc_event->data->write_block_data.write_block = write_data->block[block_num];
-            mfc_event->data->write_block_data.write_block_provided = true;
-        } else {
-            mfc_event->data->write_block_data.write_block_provided = false;
-        }
-    } else if(mfc_event->type == MfClassicPollerEventTypeSuccess) {
-        furi_string_reset(instance->text_box_store);
-        view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventPollerSuccess);
-        command = NfcCommandStop;
-    } else if(mfc_event->type == MfClassicPollerEventTypeFail) {
-        furi_string_set(instance->text_box_store, "Not all sectors\nwere written\ncorrectly");
-        view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventPollerFailure);
-        command = NfcCommandStop;
-    }
-
-    return command;
-}
-
-static void nfc_scene_write_on_enter_mf_classic(NfcApp* instance) {
-    instance->poller = nfc_poller_alloc(instance->nfc, NfcProtocolMfClassic);
-    nfc_poller_start(instance->poller, nfc_scene_write_poller_callback_mf_classic, instance);
-    furi_string_set(instance->text_box_store, "Use the source\ncard only");
-}
-
 const NfcProtocolSupportBase nfc_protocol_support_mf_classic = {
-    .features = NfcProtocolFeatureEmulateFull | NfcProtocolFeatureMoreInfo |
-                NfcProtocolFeatureWrite,
+    .features = NfcProtocolFeatureEmulateFull | NfcProtocolFeatureMoreInfo,
 
     .scene_info =
         {
@@ -418,14 +310,4 @@ const NfcProtocolSupportBase nfc_protocol_support_mf_classic = {
             .on_enter = nfc_scene_emulate_on_enter_mf_classic,
             .on_event = nfc_protocol_support_common_on_event_empty,
         },
-    .scene_write =
-        {
-            .on_enter = nfc_scene_write_on_enter_mf_classic,
-            .on_event = nfc_protocol_support_common_on_event_empty,
-        },
-
-    .extra_scenes = mf_classic_extra_scenes,
-    .extra_scenes_count = MfClassicExtraSceneNum,
 };
-
-NFC_PROTOCOL_SUPPORT_PLUGIN(mf_classic, NfcProtocolMfClassic);

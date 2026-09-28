@@ -151,6 +151,7 @@ typedef enum {
     StorageCommandCommonResolvePath,
     StorageCommandSDMount,
     StorageCommandCommonEquivalentPath,
+    StorageCommandCommonMtime, // R0N1N: storage_common_mtime(), reuses SADataCTimestamp
 } StorageCommand;
 
 typedef struct {

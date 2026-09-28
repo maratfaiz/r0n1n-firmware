@@ -6,39 +6,19 @@
 
 #define TAG "DesktopSettings"
 
-#define DESKTOP_SETTINGS_VER_14 (14)
-#define DESKTOP_SETTINGS_VER_17 (17)
-#define DESKTOP_SETTINGS_VER    (18)
+#define DESKTOP_SETTINGS_VER_10 (10)
+#define DESKTOP_SETTINGS_VER    (11)
 
 #define DESKTOP_SETTINGS_PATH  INT_PATH(DESKTOP_SETTINGS_FILE_NAME)
 #define DESKTOP_SETTINGS_MAGIC (0x17)
 
 typedef struct {
-    uint32_t auto_lock_delay_ms;
-    uint8_t displayBatteryPercentage;
-    uint8_t dummy_mode;
-    uint8_t display_clock;
-    FavoriteApp favorite_apps[FavoriteAppNumber];
-    FavoriteApp dummy_apps[DummyAppNumber];
-} DesktopSettingsV14;
+    uint8_t reserved[11];
+    DesktopSettings settings;
+} DesktopSettingsV10;
 
-// Actual size of DesktopSettings v13
-//static_assert(sizeof(DesktopSettingsV13) == 1234);
-
-static void desktop_settings_terminate_apps(FavoriteApp* apps, size_t count) {
-    for(size_t i = 0; i < count; i++) {
-        apps[i].name_or_path[sizeof(apps[i].name_or_path) - 1] = '\0';
-    }
-}
-
-/** saved_struct checks magic, version, size and an 8-bit sum, but never the payload, so the file
- * can hold a string with no terminator in it. Everything here is later used as a C string.
- */
-static void desktop_settings_terminate_strings(DesktopSettings* settings) {
-    desktop_settings_terminate_apps(settings->favorite_apps, FavoriteAppNumber);
-    desktop_settings_terminate_apps(settings->dummy_apps, DummyAppNumber);
-    settings->menu_style[sizeof(settings->menu_style) - 1] = '\0';
-}
+// Actual size of DesktopSettings v10
+static_assert(sizeof(DesktopSettingsV10) == 1044);
 
 void desktop_settings_load(DesktopSettings* settings) {
     furi_assert(settings);
@@ -57,44 +37,21 @@ void desktop_settings_load(DesktopSettings* settings) {
                 DESKTOP_SETTINGS_MAGIC,
                 DESKTOP_SETTINGS_VER);
 
-        } else if(version == DESKTOP_SETTINGS_VER_17) {
-            success = saved_struct_load(
-                DESKTOP_SETTINGS_PATH,
-                settings,
-                offsetof(DesktopSettings, menu_style),
-                DESKTOP_SETTINGS_MAGIC,
-                DESKTOP_SETTINGS_VER_17);
-
-            if(success) {
-                memset(settings->menu_style, 0, sizeof(settings->menu_style));
-            }
-
-        } else if(version == DESKTOP_SETTINGS_VER_14) {
-            DesktopSettingsV14* settings_v14 = malloc(sizeof(DesktopSettingsV14));
+        } else if(version == DESKTOP_SETTINGS_VER_10) {
+            DesktopSettingsV10* settings_v10 = malloc(sizeof(DesktopSettingsV10));
 
             success = saved_struct_load(
                 DESKTOP_SETTINGS_PATH,
-                settings_v14,
-                sizeof(DesktopSettingsV14),
+                settings_v10,
+                sizeof(DesktopSettingsV10),
                 DESKTOP_SETTINGS_MAGIC,
-                DESKTOP_SETTINGS_VER_14);
+                DESKTOP_SETTINGS_VER_10);
 
             if(success) {
-                settings->auto_lock_delay_ms = settings_v14->auto_lock_delay_ms;
-                settings->usb_inhibit_auto_lock = 0;
-                settings->displayBatteryPercentage = settings_v14->displayBatteryPercentage;
-                settings->dummy_mode = settings_v14->dummy_mode;
-                settings->display_clock = settings_v14->display_clock;
-                memcpy(
-                    settings->favorite_apps,
-                    settings_v14->favorite_apps,
-                    sizeof(settings->favorite_apps));
-                memcpy(
-                    settings->dummy_apps, settings_v14->dummy_apps, sizeof(settings->dummy_apps));
-                memset(settings->menu_style, 0, sizeof(settings->menu_style));
+                *settings = settings_v10->settings;
             }
 
-            free(settings_v14);
+            free(settings_v10);
         }
 
     } while(false);
@@ -103,8 +60,6 @@ void desktop_settings_load(DesktopSettings* settings) {
         FURI_LOG_W(TAG, "Failed to load file, using defaults");
         memset(settings, 0, sizeof(DesktopSettings));
         desktop_settings_save(settings);
-    } else {
-        desktop_settings_terminate_strings(settings);
     }
 }
 
