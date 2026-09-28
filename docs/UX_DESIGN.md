@@ -12,8 +12,8 @@ changes the role of the home screen itself: it shows the **device's
 state**, not a list of things you could launch.
 
 Large **time**, **date** below it, **battery** in the corner, a thin strip
-of system indicators (BLE, USB, SD, active radio, current profile). A
-dolphin/animation is optional, via asset packs.
+of system indicators (BLE, USB, SD, active radio, current profile). The
+mascot (see "Mascot") lives in the idle animation underneath, not on Home.
 Minimal by design: the essentials are visible immediately, no menu diving
 required.
 
@@ -110,6 +110,29 @@ left so they remain readable over any picture.
 menu: short lessons (buttons, Home, simple mode, TV remote, files,
 charging and SD card, updating, responsible use), each ending with one
 question; passed lessons are remembered.
+
+## Mascot
+
+R0N1N's mascot is a ninja-cat (кот-ниндзя): a sitting cat with a ninja
+mask band across the eyes, a headband whose tails stream to the side, and a
+curled tail. It replaces the stock Flipper dolphin everywhere the dolphin
+appeared as the device's character, in 1-bit:
+
+- **lock screen** — the "how to unlock" hint (`R_Mascot_45x42`, in
+  `desktop/views/desktop_view_locked.c`);
+- **idle animation** — the built-in idle (`assets/dolphin/internal/
+  L1_Tv_128x47`) is a sitting cat that blinks and dozes; it runs under the
+  Home dashboard as before, so it shows through anywhere the dashboard does
+  not cover it. The English speech-bubble easter eggs are dropped;
+- **level-up** — the celebration one-shots (`assets/icons/Animations/
+  Levelup1_128x64`, `Levelup2_128x64`) show the cat with rising twinkles
+  and up-chevrons;
+- **boot splash** — a compact mascot head (`R_MascotHead_24x22`) settles in
+  beside the wordmark once the blade lands.
+
+The stock `WarningDolphin` icon stays as the generic "something went wrong"
+symbol in error dialogs (SD, NFC, Sub-GHz), which is a separate role from
+the mascot.
 
 Brand moments carry the 77×20 R0N1N wordmark (`r0n1n_ui_logo`):
 

@@ -2,6 +2,8 @@
 
 #include <furi.h>
 #include <gui/r0n1n_ui.h>
+#include <gui/canvas.h>
+#include <assets_icons.h>
 
 #define R0N1N_BOOT_FRAME_MS 33
 
@@ -107,6 +109,9 @@ void r0n1n_boot_draw(Canvas* canvas, uint32_t t) {
     r0n1n_boot_draw_blade(canvas, t);
 
     if(t >= T_BLADE) {
+        // The mascot settles in beside the wordmark once the blade lands.
+        canvas_draw_icon(canvas, 1, LOGO_Y + 1, &I_R_MascotHead_24x22);
+
         canvas_set_font(canvas, FontSecondary);
         size_t chars = SIZE_MAX;
         if(t < T_MOTTO) chars = 1 + 16 * (t - T_BLADE) / (T_MOTTO - T_BLADE);
