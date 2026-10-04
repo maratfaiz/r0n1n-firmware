@@ -27,7 +27,6 @@ typedef enum {
     FontSecondary,
     FontKeyboard,
     FontBigNumbers,
-    FontBatteryPercent,
 
     // Keep last for fonts number calculation
     FontTotalNumber,
@@ -85,22 +84,6 @@ typedef enum {
 /** Canvas anonymous structure */
 typedef struct Canvas Canvas;
 
-/** Get canvas buffer.
- *
- * @param      canvas  Canvas instance
- *
- * @return     pointer to buffer
- */
-uint8_t* canvas_get_buffer(Canvas* canvas);
-
-/** Get canvas buffer size.
- *
- * @param      canvas  Canvas instance
- *
- * @return     size of canvas in bytes
- */
-size_t canvas_get_buffer_size(const Canvas* canvas);
-
 /** Reset canvas drawing tools configuration
  *
  * @param      canvas  Canvas instance
@@ -136,14 +119,6 @@ size_t canvas_height(const Canvas* canvas);
  * @return     height in pixels.
  */
 size_t canvas_current_font_height(const Canvas* canvas);
-
-/** Get current font width
- *
- * @param      canvas  Canvas instance
- *
- * @return     width in pixels.
- */
-size_t canvas_current_font_width(const Canvas* canvas);
 
 /** Get font parameters
  *
@@ -421,21 +396,6 @@ void canvas_draw_glyph(Canvas* canvas, int32_t x, int32_t y, uint16_t ch);
  */
 void canvas_set_bitmap_mode(Canvas* canvas, bool alpha);
 
-/** Set canvas orientation
- *
- * @param      canvas       Canvas instance
- * @param      orientation  CanvasOrientation
- */
-void canvas_set_orientation(Canvas* canvas, CanvasOrientation orientation);
-
-/** Get canvas orientation
- *
- * @param      canvas  Canvas instance
- *
- * @return     CanvasOrientation
- */
-CanvasOrientation canvas_get_orientation(const Canvas* canvas);
-
 /** Draw rounded-corner frame of width, height at x,y, with round value radius
  *
  * @param      canvas  Canvas instance
@@ -453,7 +413,7 @@ void canvas_draw_rframe(
     size_t height,
     size_t radius);
 
-/** Draw rounded-corner box of width, height at x,y, with round value radius
+/** Draw rounded-corner box of width, height at x,y, with round value raduis
  *
  * @param      canvas  Canvas instance
  * @param      x       x coordinate
@@ -469,14 +429,6 @@ void canvas_draw_rbox(
     size_t width,
     size_t height,
     size_t radius);
-
-void canvas_draw_icon_bitmap(
-    Canvas* canvas,
-    uint8_t x,
-    uint8_t y,
-    int16_t w,
-    int16_t h,
-    const Icon* icon);
 
 #ifdef __cplusplus
 }

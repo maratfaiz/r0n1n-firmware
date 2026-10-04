@@ -11,28 +11,23 @@ extern const SubGhzProtocolEncoder subghz_protocol_kinggates_stylo_4k_encoder;
 extern const SubGhzProtocol subghz_protocol_kinggates_stylo_4k;
 
 /**
- * Allocate SubGhzProtocolEncoderKingGates_stylo_4k.
- * @param environment Pointer to a SubGhzEnvironment instance
- * @return SubGhzProtocolEncoderKingGates_stylo_4k* pointer to a SubGhzProtocolEncoderKingGates_stylo_4k instance
- */
-void* subghz_protocol_encoder_kinggates_stylo_4k_alloc(SubGhzEnvironment* environment);
-
-/**
- * Deserialize and generating an upload to send.
- * @param context Pointer to a SubGhzProtocolEncoderKingGates_stylo_4k instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @return true On success
- */
-SubGhzProtocolStatus subghz_protocol_encoder_kinggates_stylo_4k_deserialize(
-    void* context,
-    FlipperFormat* flipper_format);
-
-/**
  * Allocate SubGhzProtocolDecoderKingGates_stylo_4k.
  * @param environment Pointer to a SubGhzEnvironment instance
  * @return SubGhzProtocolDecoderKingGates_stylo_4k* pointer to a SubGhzProtocolDecoderKingGates_stylo_4k instance
  */
 void* subghz_protocol_decoder_kinggates_stylo_4k_alloc(SubGhzEnvironment* environment);
+
+/**
+ * Free SubGhzProtocolDecoderKingGates_stylo_4k.
+ * @param context Pointer to a SubGhzProtocolDecoderKingGates_stylo_4k instance
+ */
+void subghz_protocol_decoder_kinggates_stylo_4k_free(void* context);
+
+/**
+ * Reset decoder SubGhzProtocolDecoderKingGates_stylo_4k.
+ * @param context Pointer to a SubGhzProtocolDecoderKingGates_stylo_4k instance
+ */
+void subghz_protocol_decoder_kinggates_stylo_4k_reset(void* context);
 
 /**
  * Parse a raw sequence of levels and durations received from the air.
@@ -41,6 +36,25 @@ void* subghz_protocol_decoder_kinggates_stylo_4k_alloc(SubGhzEnvironment* enviro
  * @param duration Duration of this level in, us
  */
 void subghz_protocol_decoder_kinggates_stylo_4k_feed(void* context, bool level, uint32_t duration);
+
+/**
+ * Getting the hash sum of the last randomly received parcel.
+ * @param context Pointer to a SubGhzProtocolDecoderKingGates_stylo_4k instance
+ * @return hash Hash sum
+ */
+uint8_t subghz_protocol_decoder_kinggates_stylo_4k_get_hash_data(void* context);
+
+/**
+ * Serialize data SubGhzProtocolDecoderKingGates_stylo_4k.
+ * @param context Pointer to a SubGhzProtocolDecoderKingGates_stylo_4k instance
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param preset The modulation on which the signal was received, SubGhzRadioPreset
+ * @return status
+ */
+SubGhzProtocolStatus subghz_protocol_decoder_kinggates_stylo_4k_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset);
 
 /**
  * Deserialize data SubGhzProtocolDecoderKingGates_stylo_4k.

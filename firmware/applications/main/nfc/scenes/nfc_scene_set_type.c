@@ -21,29 +21,31 @@ void nfc_scene_set_type_on_enter(void* context) {
     Submenu* submenu = instance->submenu;
     submenu_add_item(
         submenu,
-        "NFC-A 7-bytes UID",
+        "NFC-A, UID 7 байт",
         SubmenuIndexNFCA7,
         nfc_protocol_support_common_submenu_callback,
         instance);
     submenu_add_item(
         submenu,
-        "NFC-A 4-bytes UID",
+        "NFC-A, UID 4 байта",
         SubmenuIndexNFCA4,
         nfc_protocol_support_common_submenu_callback,
         instance);
 
+    FuriString* str = furi_string_alloc();
     for(size_t i = 0; i < NfcDataGeneratorTypeNum; i++) {
-        const char* name = nfc_data_generator_get_name(i);
-        submenu_add_item(submenu, name, i, nfc_protocol_support_common_submenu_callback, instance);
-    }
+        furi_string_cat_str(str, nfc_data_generator_get_name(i));
+        furi_string_replace_str(str, "Mifare", "MIFARE");
 
-    // Restore the previously picked row when returning from a generated card (stored +1, so the
-    // default 0 state means "nothing picked yet" and the list opens at the top).
-    const uint32_t selected =
-        scene_manager_get_scene_state(instance->scene_manager, NfcSceneSetType);
-    if(selected) {
-        submenu_set_selected_item(submenu, selected - 1);
+        submenu_add_item(
+            submenu,
+            furi_string_get_cstr(str),
+            i,
+            nfc_protocol_support_common_submenu_callback,
+            instance);
+        furi_string_reset(str);
     }
+    furi_string_free(str);
 
     view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewMenu);
 }
@@ -53,9 +55,6 @@ bool nfc_scene_set_type_on_event(void* context, SceneManagerEvent event) {
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        // Remember the picked row so the list restores the cursor on return (see on_enter).
-        scene_manager_set_scene_state(instance->scene_manager, NfcSceneSetType, event.event + 1);
-
         if(event.event == SubmenuIndexNFCA7) {
             nfc_scene_set_type_init_edit_data(instance->iso14443_3a_edit_data, 7);
             scene_manager_next_scene(instance->scene_manager, NfcSceneSetSak);

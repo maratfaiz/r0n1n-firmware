@@ -1,30 +1,6 @@
 #include "lfrfid_i.h"
 #include <dolphin/dolphin.h>
 
-//TODO: use .txt file in resources for passwords.
-const uint32_t default_passwords[] = {
-    0x00000000, 0x00000001, 0x00000002, 0x0000000A, 0x0000000B, 0x00012323, 0x000D8787, 0x00434343,
-    0x01010101, 0x01020304, 0x01234567, 0x02030405, 0x03040506, 0x04050607, 0x05060708, 0x05D73B9F,
-    0x06070809, 0x0708090A, 0x07CEE75D, 0x07D7BB0B, 0x08090A0B, 0x090A0B0C, 0x0A0B0C0D, 0x0B0C0D0E,
-    0x0C0D0E0F, 0x0CB7E7FC, 0x10000000, 0x10041004, 0x10101010, 0x11111111, 0x11112222, 0x11223344,
-    0x12121212, 0x121AD038, 0x12341234, 0x12344321, 0x12345678, 0x1234ABCD, 0x126C248A, 0x13131313,
-    0x19721972, 0x19920427, 0x1C0B5848, 0x20000000, 0x20002000, 0x20206666, 0x22222222, 0x22334455,
-    0x27182818, 0x30000000, 0x31415926, 0x314159E0, 0x33333333, 0x33445566, 0x40000000, 0x44444444,
-    0x444E4752, 0x44556677, 0x44B44CAE, 0x4E457854, 0x4F271149, 0x50000000, 0x50415353, 0x50520901,
-    0x50524F58, 0x51243648, 0x5469616E, 0x55555555, 0x55667788, 0x55AA55AA, 0x575F4F4B, 0x57721566,
-    0x60000000, 0x65857569, 0x66666666, 0x66778899, 0x69314718, 0x69696969, 0x70000000, 0x7686962A,
-    0x77777777, 0x778899AA, 0x7854794A, 0x80000000, 0x87654321, 0x88661858, 0x88888888, 0x8899AABB,
-    0x89A69E60, 0x90000000, 0x932D9963, 0x93C467E3, 0x9636EF8F, 0x99999999, 0x99AABBCC, 0x9E3779B9,
-    0xA0000000, 0xA0A1A2A3, 0xA5B4C3D2, 0xAA55AA55, 0xAA55BBBB, 0xAAAAAAAA, 0xAABBCCDD, 0xABCD1234,
-    0xB0000000, 0xB0B1B2B3, 0xB5F44686, 0xBBBBBBBB, 0xBBCCDDEE, 0xC0000000, 0xC0F5009A, 0xC6EF3720,
-    0xCCCCCCCC, 0xCCDDEEFF, 0xD0000000, 0xDDDDDDDD, 0xDEADC0DE, 0xE0000000, 0xE4204998, 0xE9920427,
-    0xEEEEEEEE, 0xF0000000, 0xF1EA5EED, 0xF9DCEBA0, 0xFABADA11, 0xFEEDBEEF, 0xFFFFFFFF};
-
-const uint32_t* lfrfid_get_t5577_default_passwords(uint8_t* len) {
-    *len = sizeof(default_passwords) / sizeof(uint32_t);
-    return default_passwords;
-}
-
 static bool lfrfid_debug_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
     LfRfid* app = context;
@@ -60,7 +36,6 @@ static void rpc_command_callback(const RpcAppSystemEvent* event, void* context) 
 static LfRfid* lfrfid_alloc(void) {
     LfRfid* lfrfid = malloc(sizeof(LfRfid));
 
-    lfrfid->variable_item_list = NULL;
     lfrfid->storage = furi_record_open(RECORD_STORAGE);
     lfrfid->dialogs = furi_record_open(RECORD_DIALOGS);
 
@@ -120,13 +95,6 @@ static LfRfid* lfrfid_alloc(void) {
     view_dispatcher_add_view(
         lfrfid->view_dispatcher, LfRfidViewByteInput, byte_input_get_view(lfrfid->byte_input));
 
-    // Number Input
-    lfrfid->number_input = number_input_alloc();
-    view_dispatcher_add_view(
-        lfrfid->view_dispatcher,
-        LfRfidViewNumberInput,
-        number_input_get_view(lfrfid->number_input));
-
     // Read custom view
     lfrfid->read_view = lfrfid_view_read_alloc();
     view_dispatcher_add_view(
@@ -176,16 +144,6 @@ static void lfrfid_free(LfRfid* lfrfid) {
     // ByteInput
     view_dispatcher_remove_view(lfrfid->view_dispatcher, LfRfidViewByteInput);
     byte_input_free(lfrfid->byte_input);
-
-    // Number Input
-    view_dispatcher_remove_view(lfrfid->view_dispatcher, LfRfidViewNumberInput);
-    number_input_free(lfrfid->number_input);
-
-    // Variable Item List - only allocated if the user opened a settings page
-    if(lfrfid->variable_item_list) {
-        view_dispatcher_remove_view(lfrfid->view_dispatcher, LfRfidViewVariableItemList);
-        variable_item_list_free(lfrfid->variable_item_list);
-    }
 
     // Read custom view
     view_dispatcher_remove_view(lfrfid->view_dispatcher, LfRfidViewRead);
@@ -292,37 +250,10 @@ bool lfrfid_load_key_from_file_select(LfRfid* app) {
     return result;
 }
 
-bool lfrfid_load_raw_key_from_file_select(LfRfid* app) {
-    furi_assert(app);
-
-    DialogsFileBrowserOptions browser_options;
-    dialog_file_browser_set_basic_options(&browser_options, ".raw", &I_125_10px);
-    browser_options.base_path = LFRFID_APP_FOLDER;
-
-    // Input events and views are managed by file_browser
-    bool result =
-        dialog_file_browser_show(app->dialogs, app->file_path, app->file_path, &browser_options);
-
-    if(result) {
-        // Extract .raw
-        path_extract_filename(app->file_path, app->file_name, true);
-        //path_extract_filename(app->file_name, app->file_name, true);
-    }
-
-    return result;
-}
-
-bool lfrfid_delete_key_file(LfRfid* app, const FuriString* path) {
-    furi_assert(app);
-    furi_assert(path);
-
-    return storage_simply_remove(app->storage, furi_string_get_cstr(path));
-}
-
 bool lfrfid_delete_key(LfRfid* app) {
     furi_assert(app);
 
-    return lfrfid_delete_key_file(app, app->file_path);
+    return storage_simply_remove(app->storage, furi_string_get_cstr(app->file_path));
 }
 
 bool lfrfid_load_key_data(LfRfid* app, FuriString* path, bool show_dialog) {
@@ -337,7 +268,7 @@ bool lfrfid_load_key_data(LfRfid* app, FuriString* path, bool show_dialog) {
     } while(0);
 
     if((!result) && (show_dialog)) {
-        dialog_message_show_storage_error(app->dialogs, "Cannot load\nkey file");
+        dialog_message_show_storage_error(app->dialogs, "Не удалось\nзагрузить ключ");
     }
 
     return result;
@@ -347,7 +278,7 @@ bool lfrfid_save_key_data(LfRfid* app, FuriString* path) {
     bool result = lfrfid_dict_file_save(app->dict, app->protocol_id, furi_string_get_cstr(path));
 
     if(!result) {
-        dialog_message_show_storage_error(app->dialogs, "Cannot save\nkey file");
+        dialog_message_show_storage_error(app->dialogs, "Не удалось\nсохранить ключ");
     }
 
     return result;
@@ -357,7 +288,7 @@ void lfrfid_make_app_folder(LfRfid* app) {
     furi_assert(app);
 
     if(!storage_simply_mkdir(app->storage, LFRFID_APP_FOLDER)) {
-        dialog_message_show_storage_error(app->dialogs, "Cannot create\napp folder");
+        dialog_message_show_storage_error(app->dialogs, "Не удалось\nсоздать папку");
     }
 }
 
@@ -366,9 +297,7 @@ void lfrfid_text_store_set(LfRfid* app, const char* text, ...) {
     va_list args;
     va_start(args, text);
 
-    // sizeof, not LFRFID_TEXT_STORE_SIZE: the buffer carries the extra byte for the terminator,
-    // so passing the size without it cost every caller one character.
-    vsnprintf(app->text_store, sizeof(app->text_store), text, args);
+    vsnprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, text, args);
 
     va_end(args);
 }

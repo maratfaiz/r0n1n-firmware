@@ -32,8 +32,8 @@ application of the "progressive disclosure of complexity" principle from
 
 Spectrum/frequency analysis within CC1101's limits (not an SDR — see
 `HARDWARE.md`), capture/replay, fixed-code brute force (lab use), decoders
-for known protocols (POCSAG, TPMS, weather stations — reusing decoders
-that already exist in Unleashed).
+for known protocols (POCSAG, TPMS, weather stations — via decoders from
+the official App Catalog rather than new code).
 
 ### NFC/RFID
 

@@ -9,12 +9,10 @@ static const char* protocol_names[NfcProtocolNum] = {
     [NfcProtocolFelica] = "FeliCa",
     [NfcProtocolMfUltralight] = "Mifare Ultralight",
     [NfcProtocolMfClassic] = "Mifare Classic",
-    [NfcProtocolMfPlus] = "Mifare Plus",
     [NfcProtocolMfDesfire] = "Mifare DESFire",
+    [NfcProtocolMfPlus] = "Mifare Plus",
     [NfcProtocolSlix] = "Slix",
     [NfcProtocolSt25tb] = "St25tb",
-    [NfcProtocolNtag4xx] = "Ntag4xx",
-    [NfcProtocolType4Tag] = "Type 4 Tag",
 };
 
 const char* nfc_cli_get_protocol_name(NfcProtocol protocol) {

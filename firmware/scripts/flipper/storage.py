@@ -69,12 +69,8 @@ class BufferedRead:
         self.buffer = bytearray()
         self.stream = stream
 
-    def until(self, eol: str = "\n", cut_eol: bool = True, timeout: float = None):
+    def until(self, eol: str = "\n", cut_eol: bool = True):
         eol = eol.encode("ascii")
-        # timeout=None keeps the original behavior: wait forever (e.g. while the
-        # device reboots during an update). A timeout is only passed on the copy
-        # path, where a silent device means a hung transfer, not a slow reboot.
-        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             # search in buffer
             i = self.buffer.find(eol)
@@ -90,32 +86,16 @@ class BufferedRead:
             i = max(1, self.stream.in_waiting)
             data = self.stream.read(i)
             self.buffer.extend(data)
-            if deadline is None:
-                continue
-            if data:
-                deadline = time.monotonic() + timeout
-            elif time.monotonic() > deadline:
-                raise FlipperStorageException(
-                    f"Timed out after {timeout:.0f}s waiting for "
-                    f"{eol!r} from Flipper (CLI/RPC hung)"
-                )
 
 
 class FlipperStorage:
     CLI_PROMPT = ">: "
     CLI_EOL = "\r\n"
-    # A silent device mid-transfer means a hung CLI/RPC, not a slow reboot, so
-    # the copy path bounds its waits; other callers (e.g. await_flipper) don't.
-    WRITE_CHUNK_TIMEOUT = 60.0
 
     def __init__(self, portname: str, chunk_size: int = 8192):
         self.port = serial.Serial()
         self.port.port = portname
         self.port.timeout = 2
-        # A blocked write means the firmware stopped draining its CDC RX (e.g. an
-        # SD stall backpressures USB); without this, port.write() hangs forever
-        # mid-transfer. A write never legitimately blocks this long.
-        self.port.write_timeout = self.WRITE_CHUNK_TIMEOUT
         self.port.baudrate = 115200  # Doesn't matter for VCP
         self.read = BufferedRead(self.port)
         self.chunk_size = chunk_size
@@ -266,19 +246,17 @@ class FlipperStorage:
                 if size == 0:
                     break
 
-                timeout = self.WRITE_CHUNK_TIMEOUT
-                self.send(f'storage write_chunk "{filename_to}" {size}\r')
-                self.read.until(self.CLI_EOL, timeout=timeout)
-                answer = self.read.until(self.CLI_EOL, timeout=timeout)
+                self.send_and_wait_eol(f'storage write_chunk "{filename_to}" {size}\r')
+                answer = self.read.until(self.CLI_EOL)
                 if self.has_error(answer):
                     last_error = self.get_error(answer)
-                    self.read.until(self.CLI_PROMPT, timeout=timeout)
+                    self.read.until(self.CLI_PROMPT)
                     raise FlipperStorageException.from_error_code(
                         filename_to, last_error
                     )
 
                 self.port.write(filedata)
-                self.read.until(self.CLI_PROMPT, timeout=timeout)
+                self.read.until(self.CLI_PROMPT)
 
                 ftell = file.tell()
                 percent = math.ceil(ftell / filesize * 100)

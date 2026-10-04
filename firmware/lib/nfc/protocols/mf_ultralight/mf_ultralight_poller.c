@@ -228,7 +228,6 @@ static NfcCommand mf_ultralight_poller_handler_idle(MfUltralightPoller* instance
     instance->pages_read = 0;
     instance->state = MfUltralightPollerStateRequestMode;
     instance->current_page = 0;
-    instance->aes_cmac.active = false;
     return NfcCommandContinue;
 }
 
@@ -301,33 +300,11 @@ static NfcCommand mf_ultralight_poller_handler_get_feature_set(MfUltralightPolle
         mf_ultralight_get_device_name(instance->data, NfcDeviceNameTypeFull),
         instance->pages_total);
 
-    // Route every type through the signature state first: the handler reads UL-AES's 48-byte sig
-    // best-effort, other types their 32-byte sig (fatal on error), before their own auth/read.
     instance->state = MfUltralightPollerStateReadSignature;
     return NfcCommandContinue;
 }
 
 static NfcCommand mf_ultralight_poller_handler_read_signature(MfUltralightPoller* instance) {
-    // Cleared every read so a prior UL-AES read on a reused poller can't leave a stale flag on a
-    // later non-UL-AES card (only the UL-AES branch below sets it).
-    instance->data->aes_signature_present = false;
-
-    if(instance->data->type == MfUltralightTypeUltralightAES) {
-        // Best-effort before AES auth: a card without a signature must not fail the read.
-        bool present = false;
-        instance->error = mf_ultralight_poller_read_signature_aes(
-            instance, instance->data->aes_signature, &present);
-        instance->data->aes_signature_present = present;
-        if(instance->error != MfUltralightErrorNone) {
-            FURI_LOG_D(TAG, "UL-AES signature read error %d (ignored)", instance->error);
-            instance->error = MfUltralightErrorNone;
-        } else if(!present) {
-            FURI_LOG_D(TAG, "UL-AES card has no originality signature");
-        }
-        instance->state = MfUltralightPollerStateAuthAes;
-        return NfcCommandContinue;
-    }
-
     MfUltralightPollerState next_state = MfUltralightPollerStateAuth;
     if(mf_ultralight_support_feature(
            instance->feature_set, MfUltralightFeatureSupportReadSignature)) {
@@ -360,12 +337,10 @@ static NfcCommand mf_ultralight_poller_handler_read_counters(MfUltralightPoller*
             break;
         }
 
-        // UL-AES has no MfUltralightConfigPages (config_page = 0). Its counter-2 read protection
-        // (CNT_RD_EN) is enforced by the card NAKing when unauthenticated, which is tolerated below
-        // (read failure just moves on). Other types consult the config's password-protection flag.
         MfUltralightConfigPages* config = NULL;
-        if(mf_ultralight_get_config_page(instance->data, &config) &&
-           config->access.nfc_cnt_pwd_prot && !instance->auth_context.auth_success) {
+        mf_ultralight_get_config_page(instance->data, &config);
+
+        if(config->access.nfc_cnt_pwd_prot && !instance->auth_context.auth_success) {
             FURI_LOG_D(TAG, "Counter reading is protected with password");
             instance->state = MfUltralightPollerStateReadTearingFlags;
             break;
@@ -381,14 +356,9 @@ static NfcCommand mf_ultralight_poller_handler_read_counters(MfUltralightPoller*
             instance->counters_read = 2;
         }
 
-        const uint8_t counter_num = instance->counters_read;
-        MfUltralightCounter* counter = &instance->data->counter[counter_num];
-        FURI_LOG_D(TAG, "Reading counter %d", counter_num);
-        // Over secure messaging the plain READ_CNT is rejected; use the CMAC-wrapped variant.
-        instance->error =
-            instance->aes_cmac.active ?
-                mf_ultralight_poller_read_counter_aes_cmac(instance, counter_num, counter) :
-                mf_ultralight_poller_read_counter(instance, counter_num, counter);
+        FURI_LOG_D(TAG, "Reading counter %d", instance->counters_read);
+        instance->error = mf_ultralight_poller_read_counter(
+            instance, instance->counters_read, &instance->data->counter[instance->counters_read]);
         if(instance->error != MfUltralightErrorNone) {
             FURI_LOG_D(TAG, "Failed to read %d counter", instance->counters_read);
             instance->state = MfUltralightPollerStateReadTearingFlags;
@@ -448,14 +418,9 @@ static NfcCommand mf_ultralight_poller_handler_auth(MfUltralightPoller* instance
         command = instance->callback(instance->general_event, instance->context);
         if(!instance->mfu_event.data->auth_context.skip_auth) {
             instance->auth_context.password = instance->mfu_event.data->auth_context.password;
-#ifndef LOGS_RELEASE_BUILD
             uint32_t pass = bit_lib_bytes_to_num_be(
                 instance->auth_context.password.data, sizeof(MfUltralightAuthPassword));
             FURI_LOG_D(TAG, "Trying to authenticate with password %08lX", pass);
-#else
-            bit_lib_bytes_to_num_be(
-                instance->auth_context.password.data, sizeof(MfUltralightAuthPassword));
-#endif
             instance->error = mf_ultralight_poller_auth_pwd(instance, &instance->auth_context);
             if(instance->error == MfUltralightErrorNone) {
                 FURI_LOG_D(TAG, "Auth success");
@@ -582,104 +547,6 @@ static NfcCommand mf_ultralight_poller_handler_auth_ultralight_c(MfUltralightPol
     return command;
 }
 
-// Record a recovered AES key in the auth context and notify the app with AuthSuccess.
-// Returns the callback's command.
-static NfcCommand mf_ultralight_poller_report_aes_auth_success(
-    MfUltralightPoller* instance,
-    const MfUltralightAesKey* key,
-    MfUltralightAesKeyType key_type) {
-    instance->auth_context.aes_key = *key;
-    instance->auth_context.aes_key_type = key_type;
-    instance->auth_context.auth_success = true;
-    instance->mfu_event.data->auth_context = instance->auth_context;
-    instance->mfu_event.type = MfUltralightPollerEventTypeAuthSuccess;
-    return instance->callback(instance->general_event, instance->context);
-}
-
-static NfcCommand mf_ultralight_poller_handler_auth_aes(MfUltralightPoller* instance) {
-    NfcCommand command = NfcCommandContinue;
-
-    // Secure-messaging re-auth: a plain read NAK'd right after the first auth, so the card requires
-    // CMAC. Re-authenticate with the already-found key (the NAK dropped the session) and read with
-    // CMAC from here on. This takes precedence over the dict/read key requests below.
-    if(instance->aes_cmac.active) {
-        instance->error = mf_ultralight_poller_authenticate_aes(
-            instance, instance->auth_context.aes_key.data, instance->auth_context.aes_key_type);
-        if(instance->error == MfUltralightErrorNone) {
-            instance->state = MfUltralightPollerStateReadPages;
-        } else {
-            // Re-auth failed (card gone, or not actually secure messaging): give up on CMAC. Nothing
-            // was captured in this path (the switch only triggers at pages_read == 0), so report a
-            // read failure rather than a false success.
-            instance->aes_cmac.active = false;
-            iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-            instance->state = (instance->pages_read > 0) ? MfUltralightPollerStateReadSuccess :
-                                                           MfUltralightPollerStateReadFailed;
-        }
-        return command;
-    }
-
-    if(instance->mode == MfUltralightPollerModeDictAttack) {
-        // One key per activation: a failed AES auth unselects the card, so the next key is tried on
-        // a fresh activation (NfcCommandReset re-runs anticollision) while staying in this state.
-        instance->mfu_event.type = MfUltralightPollerEventTypeRequestKey;
-        command = instance->callback(instance->general_event, instance->context);
-
-        if(!instance->mfu_event.data->key_request_data.key_provided) {
-            // Dictionary exhausted: read whatever is accessible without a key.
-            instance->state = MfUltralightPollerStateReadPages;
-            return command;
-        }
-
-        const MfUltralightAesKey* key = &instance->mfu_event.data->key_request_data.aes_key;
-        instance->error =
-            mf_ultralight_poller_authenticate_aes(instance, key->data, MfUltralightAesKeyTypeData);
-        if(instance->error == MfUltralightErrorNone) {
-            FURI_LOG_D(TAG, "UL-AES dict auth success");
-            command = mf_ultralight_poller_report_aes_auth_success(
-                instance, key, MfUltralightAesKeyTypeData);
-            instance->state = MfUltralightPollerStateReadPages;
-        } else {
-            iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-            command = NfcCommandReset; // re-select and try the next dictionary key
-        }
-        return command;
-    }
-
-    // Read mode: authenticate with a single key supplied by the unlock/key-input flow, or skip.
-    instance->mfu_event.type = MfUltralightPollerEventTypeAuthRequest;
-    command = instance->callback(instance->general_event, instance->context);
-
-    MfUltralightPollerAuthContext* auth = &instance->mfu_event.data->auth_context;
-    if(!auth->skip_auth) {
-        instance->error = mf_ultralight_poller_authenticate_aes(
-            instance, auth->aes_key.data, auth->aes_key_type);
-        if(instance->error == MfUltralightErrorNone) {
-            FURI_LOG_D(TAG, "UL-AES auth success");
-            command = mf_ultralight_poller_report_aes_auth_success(
-                instance, &auth->aes_key, auth->aes_key_type);
-        } else {
-            FURI_LOG_D(TAG, "UL-AES auth failed");
-            instance->auth_context.auth_success = false;
-            instance->mfu_event.type = MfUltralightPollerEventTypeAuthFailed;
-            command = instance->callback(instance->general_event, instance->context);
-            // Re-select so the open (unprotected) pages still read after a failed auth: a wrong manual
-            // key, or a Random ID card whose UIDRetrKey isn't the default, falls back to the open data
-            // (and, for RID, the random UID) instead of failing the whole read.
-            iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-            iso14443_3a_poller_activate(instance->iso14443_3a_poller, NULL);
-        }
-    }
-    instance->state = MfUltralightPollerStateReadPages;
-    return command;
-}
-
-// A plain command rejected in a way that signals a UL-AES card wants secure messaging: a 4-bit NAK
-// (Protocol) or, on a real MF0AES20, a muted / timed-out frame (Timeout).
-static bool mf_ultralight_is_secure_messaging_switch_error(MfUltralightError error) {
-    return error == MfUltralightErrorProtocol || error == MfUltralightErrorTimeout;
-}
-
 static NfcCommand mf_ultralight_poller_handler_read_pages(MfUltralightPoller* instance) {
     MfUltralightPageReadCommandData data = {};
     uint16_t start_page = instance->pages_read;
@@ -695,13 +562,10 @@ static NfcCommand mf_ultralight_poller_handler_read_pages(MfUltralightPoller* in
             FURI_LOG_D(TAG, "Failed to calculate sector and tag from %d page", start_page);
             instance->error = MfUltralightErrorProtocol;
         }
-    } else if(instance->aes_cmac.active) {
-        instance->error = mf_ultralight_poller_read_page_aes_cmac(instance, start_page, &data);
     } else {
         instance->error = mf_ultralight_poller_read_page(instance, start_page, &data);
     }
 
-    NfcCommand command = NfcCommandContinue;
     if(instance->error == MfUltralightErrorNone) {
         if(start_page < instance->pages_total) {
             FURI_LOG_D(TAG, "Read page %d success", start_page);
@@ -713,21 +577,6 @@ static NfcCommand mf_ultralight_poller_handler_read_pages(MfUltralightPoller* in
         if(instance->pages_read == instance->pages_total) {
             instance->state = MfUltralightPollerStateReadCounters;
         }
-    } else if(
-        instance->data->type == MfUltralightTypeUltralightAES &&
-        mf_ultralight_is_secure_messaging_switch_error(instance->error) &&
-        instance->auth_context.auth_success && !instance->aes_cmac.active &&
-        instance->pages_read == 0) {
-        // A plain read failing immediately after a successful auth means the card requires secure
-        // messaging (CMAC). Enable it and re-authenticate (the failed frame dropped the session),
-        // then reads resume with CMAC. Gated on auth_success + pages_read == 0 and on UL-AES, so a
-        // removed card that times out just fails the CMAC re-auth and falls back to a clean read
-        // failure, and the plain path for every other type is untouched.
-        FURI_LOG_D(TAG, "UL-AES: plain read failed post-auth, switching to secure messaging");
-        instance->aes_cmac.active = true;
-        iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-        instance->state = MfUltralightPollerStateAuthAes;
-        command = NfcCommandReset;
     } else {
         if(instance->data->type == MfUltralightTypeMfulC &&
            !mf_ultralight_3des_key_valid(instance->data)) {
@@ -742,7 +591,7 @@ static NfcCommand mf_ultralight_poller_handler_read_pages(MfUltralightPoller* in
         }
     }
 
-    return command;
+    return NfcCommandContinue;
 }
 
 static NfcCommand mf_ultralight_poller_handler_try_default_pass(MfUltralightPoller* instance) {
@@ -752,23 +601,10 @@ static NfcCommand mf_ultralight_poller_handler_try_default_pass(MfUltralightPoll
             break;
 
         MfUltralightConfigPages* config = NULL;
-        if(!mf_ultralight_get_config_page(instance->data, &config)) break;
-
-        // AUTHLIM sits in the ACCESS page. Unread pages are zero-filled, so an unread ACCESS
-        // reads back as "no limit" - and probing the default password burns one of the very
-        // attempts AUTHLIM counts. Unknown has to mean protected.
-        //
-        // Write mode is exempt: the app skips the read-phase auth there, so this probe is the
-        // only thing that can unlock a password-protected target, and the user asked for it.
-        const uint16_t access_page = mf_ultralight_get_config_page_num(instance->data->type) + 1;
-        const bool authlim_known = instance->pages_read >= access_page + 1;
-        const bool writing_to_target = instance->mode == MfUltralightPollerModeWrite;
-
+        mf_ultralight_get_config_page(instance->data, &config);
         if(instance->auth_context.auth_success) {
             config->password = instance->auth_context.password;
             config->pack = instance->auth_context.pack;
-        } else if(!authlim_known && !writing_to_target) {
-            FURI_LOG_W(TAG, "AUTHLIM unreadable, not probing the default password");
         } else if(config->access.authlim == 0) {
             FURI_LOG_D(TAG, "No limits in authentication. Trying default password");
             bit_lib_num_to_bytes_be(
@@ -840,22 +676,6 @@ static NfcCommand mf_ultralight_poller_handler_read_fail(MfUltralightPoller* ins
 
 static NfcCommand mf_ultralight_poller_handler_read_success(MfUltralightPoller* instance) {
     FURI_LOG_D(TAG, "Read success");
-    // UL-AES key pages always read back as zero; stash the recovered DataProtKey into pages
-    // 0x30-0x33 here (after every read, so even a partial read keeps the key) for display/save, in
-    // the card's key-page byte order (memory[i] = key[15-i]) so the dump matches real tag memory and
-    // writes back verbatim (datasheet 8.6.3 example / PM3 SwapEndian16). Gated on the Data key: a
-    // Random-ID read authenticates with the UIDRetrKey only to reveal the real UID (which stays in
-    // pages 0-1, where the config view reads it) and must not stash that key as the DataProtKey, nor
-    // overwrite the presented random anticollision UID.
-    if(instance->data->type == MfUltralightTypeUltralightAES &&
-       instance->auth_context.auth_success &&
-       instance->auth_context.aes_key_type == MfUltralightAesKeyTypeData) {
-        uint8_t* dst = instance->data->page[MF_ULTRALIGHT_AES_DATA_KEY_PAGE].data;
-        const uint8_t* key = instance->auth_context.aes_key.data;
-        for(size_t i = 0; i < MF_ULTRALIGHT_AES_KEY_SIZE; i++) {
-            dst[i] = key[MF_ULTRALIGHT_AES_KEY_SIZE - 1 - i];
-        }
-    }
     instance->mfu_event.type = MfUltralightPollerEventTypeReadSuccess;
     NfcCommand command = instance->callback(instance->general_event, instance->context);
 
@@ -878,12 +698,9 @@ static NfcCommand mf_ultralight_poller_handler_request_write_data(MfUltralightPo
     instance->mfu_event.type = MfUltralightPollerEventTypeRequestWriteData;
     instance->callback(instance->general_event, instance->context);
 
-    // Save write_data to instance field before any further events clobber the union
-    instance->write_data = instance->mfu_event.data->write_data;
-    const MfUltralightData* write_data = instance->write_data;
+    const MfUltralightData* write_data = instance->mfu_event.data->write_data;
     const MfUltralightData* tag_data = instance->data;
     uint32_t features = mf_ultralight_get_feature_support_set(tag_data->type);
-    instance->write_skip_key = false;
 
     bool check_passed = false;
     do {
@@ -921,86 +738,6 @@ static NfcCommand mf_ultralight_poller_handler_request_write_data(MfUltralightPo
         check_passed = true;
     } while(false);
 
-    // Authenticate the target card before writing. The read phase left the card unauthenticated
-    // (write-mode callback skips read-phase auth). Ask the callback for keys (dictionary) until one
-    // authenticates, then fire WriteKeyRequest so the callback returns the keep/copy-key decision.
-    // UL-C uses 3DES; UL-AES uses AES (branched on the presented card type).
-    if(check_passed &&
-       mf_ultralight_support_feature(features, MfUltralightFeatureSupportAuthenticate)) {
-        const bool is_aes = (tag_data->type == MfUltralightTypeUltralightAES);
-        bool auth_ok = false;
-
-        while(!auth_ok) {
-            // Request next key from callback (tries dict entries)
-            memset(instance->mfu_event.data, 0, sizeof(MfUltralightPollerEventData));
-            instance->mfu_event.type = MfUltralightPollerEventTypeRequestKey;
-            instance->callback(instance->general_event, instance->context);
-
-            if(!instance->mfu_event.data->key_request_data.key_provided) {
-                FURI_LOG_D(TAG, "UL write: all keys exhausted");
-                break;
-            }
-
-            // Halt+activate so the card is in a clean state for auth
-            iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-            if(iso14443_3a_poller_activate(instance->iso14443_3a_poller, NULL) !=
-               Iso14443_3aErrorNone) {
-                FURI_LOG_E(TAG, "UL write: card not responding (locked out?)");
-                break;
-            }
-
-            if(is_aes) {
-                instance->auth_context.aes_key =
-                    instance->mfu_event.data->key_request_data.aes_key;
-                auth_ok =
-                    (mf_ultralight_poller_authenticate_aes(
-                         instance,
-                         instance->auth_context.aes_key.data,
-                         MfUltralightAesKeyTypeData) == MfUltralightErrorNone);
-            } else {
-                instance->auth_context.tdes_key = instance->mfu_event.data->key_request_data.key;
-                uint8_t output[MF_ULTRALIGHT_C_AUTH_DATA_SIZE];
-                uint8_t RndA[MF_ULTRALIGHT_C_AUTH_RND_BLOCK_SIZE] = {0};
-                furi_hal_random_fill_buf(RndA, sizeof(RndA));
-                if(mf_ultralight_poller_authenticate_start(instance, RndA, output) !=
-                   MfUltralightErrorNone) {
-                    break;
-                }
-                uint8_t decoded_RndA[MF_ULTRALIGHT_C_AUTH_RND_BLOCK_SIZE] = {0};
-                const uint8_t* RndB = output + MF_ULTRALIGHT_C_AUTH_RND_B_BLOCK_OFFSET;
-                if(mf_ultralight_poller_authenticate_end(instance, RndB, output, decoded_RndA) !=
-                   MfUltralightErrorNone)
-                    continue;
-                mf_ultralight_3des_shift_data(RndA);
-                auth_ok = (memcmp(RndA, decoded_RndA, sizeof(decoded_RndA)) == 0);
-            }
-            FURI_LOG_D(TAG, "UL write auth attempt: %s", auth_ok ? "success" : "fail");
-        }
-
-        if(auth_ok) {
-            // Notify callback with the found key: it returns the keep/copy-key skip decision.
-            memset(instance->mfu_event.data, 0, sizeof(MfUltralightPollerEventData));
-            if(is_aes) {
-                instance->mfu_event.data->key_request_data.aes_key =
-                    instance->auth_context.aes_key;
-            } else {
-                instance->mfu_event.data->key_request_data.key = instance->auth_context.tdes_key;
-            }
-            instance->mfu_event.data->key_request_data.key_provided = true;
-            instance->mfu_event.type = MfUltralightPollerEventTypeWriteKeyRequest;
-            instance->callback(instance->general_event, instance->context);
-            instance->write_skip_key = instance->mfu_event.data->write_key_skip;
-            FURI_LOG_D(
-                TAG,
-                "UL write: key %s",
-                instance->write_skip_key ? "kept (target unchanged)" : "overwrite with source");
-        } else {
-            FURI_LOG_E(TAG, "UL write auth failed - card locked");
-            check_passed = false;
-            instance->mfu_event.type = MfUltralightPollerEventTypeCardLocked;
-        }
-    }
-
     if(!check_passed) {
         iso14443_3a_poller_halt(instance->iso14443_3a_poller);
         command = instance->callback(instance->general_event, instance->context);
@@ -1011,105 +748,19 @@ static NfcCommand mf_ultralight_poller_handler_request_write_data(MfUltralightPo
     return command;
 }
 
-// Write one page, transparently switching to secure messaging. If a plain write fails on a
-// UL-AES card, the card may require CMAC: re-authenticate with the write key (which resets the
-// session key + counter), enable secure messaging, and retry the page MAC-wrapped. The write flow
-// starts at page 4 (user data), so the first failure distinguishes a secure-messaging card from a
-// plain one (a legitimately locked page also fails, but then the MAC'd retry fails too and the
-// write still fails); once enabled, later pages go straight to the CMAC path.
-static MfUltralightError mf_ultralight_poller_write_page_auto(
-    MfUltralightPoller* instance,
-    bool is_aes,
-    uint8_t page,
-    const MfUltralightPage* data) {
-    if(is_aes && instance->aes_cmac.active) {
-        return mf_ultralight_poller_write_page_aes_cmac(instance, page, data);
-    }
-
-    MfUltralightError error = mf_ultralight_poller_write_page(instance, page, data);
-    if(!is_aes || !mf_ultralight_is_secure_messaging_switch_error(error)) return error;
-
-    // The write key is always the Data key (see the write auth loop); UL-AES write never uses UID.
-    iso14443_3a_poller_halt(instance->iso14443_3a_poller);
-    if(iso14443_3a_poller_activate(instance->iso14443_3a_poller, NULL) != Iso14443_3aErrorNone) {
-        FURI_LOG_W(TAG, "UL-AES secure-messaging write: card gone during re-activation");
-        return error;
-    }
-    if(mf_ultralight_poller_authenticate_aes(
-           instance, instance->auth_context.aes_key.data, MfUltralightAesKeyTypeData) !=
-       MfUltralightErrorNone) {
-        // Not a secure-messaging card (or wrong write key): the original NAK stands.
-        FURI_LOG_D(TAG, "UL-AES secure-messaging write: re-auth failed, page %u locked", page);
-        return error;
-    }
-
-    instance->aes_cmac.active = true;
-    return mf_ultralight_poller_write_page_aes_cmac(instance, page, data);
-}
-
 static NfcCommand mf_ultralight_poller_handler_write_pages(MfUltralightPoller* instance) {
     NfcCommand command = NfcCommandContinue;
 
     do {
-        // Use the saved write_data pointer - the union was overwritten by WriteKeyRequest
-        const MfUltralightData* write_data = instance->write_data;
-        const bool is_aes = (write_data->type == MfUltralightTypeUltralightAES);
+        const MfUltralightData* write_data = instance->mfu_event.data->write_data;
         uint8_t end_page = mf_ultralight_get_write_end_page(write_data->type);
-
-        // If user chose to keep target's key, stop before the ULC key pages (44-47)
-        if(instance->write_skip_key && write_data->type == MfUltralightTypeMfulC &&
-           end_page > 44) {
-            end_page = 44;
-        }
-
-        // Reaching end_page finishes the write - except UL-AES copy-key, which then jumps from the
-        // data pages (end 0x28) to the DataProtKey (0x30-0x33); the config/lock pages 0x28-0x2F are
-        // never written.
         if(instance->current_page == end_page) {
-            if(!is_aes || instance->write_skip_key) {
-                instance->state = MfUltralightPollerStateWriteSuccess;
-                break;
-            }
-            instance->current_page = MF_ULTRALIGHT_AES_DATA_KEY_PAGE; // jump 0x28 -> 0x30
-        }
-        if(is_aes &&
-           instance->current_page == MF_ULTRALIGHT_AES_DATA_KEY_PAGE +
-                                         MF_ULTRALIGHT_AES_KEY_SIZE / MF_ULTRALIGHT_PAGE_SIZE) {
             instance->state = MfUltralightPollerStateWriteSuccess;
             break;
         }
-
-        // For ULC key pages (44-47): byte-order correction required.
-        // Flipper stores each 8-byte DES sub-key MSB-first; the card expects each half reversed.
-        // Transform: card_bytes = reverse(flipper[0..7]) || reverse(flipper[8..15])
-        MfUltralightPage page_to_write;
-        if(instance->current_page >= 44 && instance->current_page <= 47 &&
-           write_data->type == MfUltralightTypeMfulC) {
-            const uint8_t* raw = (const uint8_t*)&write_data->page[44];
-            uint8_t xformed[16];
-            for(int i = 0; i < 8; i++) {
-                xformed[i] = raw[7 - i];
-            }
-            for(int i = 0; i < 8; i++) {
-                xformed[8 + i] = raw[15 - i];
-            }
-            uint8_t page_offset = (instance->current_page - 44) * 4;
-            memcpy(page_to_write.data, xformed + page_offset, 4);
-            FURI_LOG_D(
-                TAG,
-                "Writing KEY page %d (byte-order corrected): %02X %02X %02X %02X",
-                instance->current_page,
-                page_to_write.data[0],
-                page_to_write.data[1],
-                page_to_write.data[2],
-                page_to_write.data[3]);
-        } else {
-            page_to_write = write_data->page[instance->current_page];
-            FURI_LOG_D(TAG, "Writing page %d", instance->current_page);
-        }
-
-        MfUltralightError error = mf_ultralight_poller_write_page_auto(
-            instance, is_aes, instance->current_page, &page_to_write);
+        FURI_LOG_D(TAG, "Writing page %d", instance->current_page);
+        MfUltralightError error = mf_ultralight_poller_write_page(
+            instance, instance->current_page, &write_data->page[instance->current_page]);
         if(error != MfUltralightErrorNone) {
             instance->state = MfUltralightPollerStateWriteFail;
             instance->error = error;
@@ -1155,7 +806,6 @@ static const MfUltralightPollerReadHandler
         [MfUltralightPollerStateCheckMfulCAuthStatus] =
             mf_ultralight_poller_handler_check_mfuc_auth_status,
         [MfUltralightPollerStateAuthMfulC] = mf_ultralight_poller_handler_auth_ultralight_c,
-        [MfUltralightPollerStateAuthAes] = mf_ultralight_poller_handler_auth_aes,
         [MfUltralightPollerStateReadPages] = mf_ultralight_poller_handler_read_pages,
         [MfUltralightPollerStateReadFailed] = mf_ultralight_poller_handler_read_fail,
         [MfUltralightPollerStateReadSuccess] = mf_ultralight_poller_handler_read_success,
@@ -1198,16 +848,9 @@ static bool mf_ultralight_poller_detect(NfcGenericEvent event, void* context) {
     const Iso14443_3aPollerEvent* iso14443_3a_event = event.event_data;
 
     if(iso14443_3a_event->type == Iso14443_3aPollerEventTypeReady) {
-        // Gate on the Ultralight SAK/ATQA before the probe read: a magic Classic clone answers an
-        // unauth READ 0x30 like Ultralight, so without this a Chinese Mini/1K also misfires as
-        // Ultralight. Mirrors PM3 (routes SAK 0x00 + ATQA hi 0x00 to the UL path).
-        if(mf_ultralight_detect_protocol(
-               iso14443_3a_poller_get_data(instance->iso14443_3a_poller))) {
-            MfUltralightPageReadCommandData read_page_cmd_data = {};
-            MfUltralightError error =
-                mf_ultralight_poller_read_page(instance, 0, &read_page_cmd_data);
-            protocol_detected = (error == MfUltralightErrorNone);
-        }
+        MfUltralightPageReadCommandData read_page_cmd_data = {};
+        MfUltralightError error = mf_ultralight_poller_read_page(instance, 0, &read_page_cmd_data);
+        protocol_detected = (error == MfUltralightErrorNone);
         iso14443_3a_poller_halt(instance->iso14443_3a_poller);
     }
 

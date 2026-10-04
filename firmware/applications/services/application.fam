@@ -6,13 +6,10 @@ App(
         "cli_vcp",
         "crypto_start",
         "rpc_start",
-        "gps_start",
-        "network_start",
         "expansion_start",
         "bt",
         "desktop",
         "loader",
         "power",
-        "namechanger_srv",
     ],
 )

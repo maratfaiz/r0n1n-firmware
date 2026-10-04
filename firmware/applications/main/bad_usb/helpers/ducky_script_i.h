@@ -22,9 +22,7 @@ extern "C" {
 #define HID_MOUSE_NONE    0
 
 struct BadUsbScript {
-    BadUsbHidInterface* interface;
-    BadUsbHidConfig* hid_cfg;
-    bool load_id_cfg;
+    FuriHalUsbHidConfig hid_cfg;
     const BadUsbHidApi* hid;
     void* hid_inst;
     FuriThread* thread;

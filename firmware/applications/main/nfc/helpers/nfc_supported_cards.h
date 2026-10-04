@@ -7,7 +7,6 @@
 #pragma once
 
 #include <core/string.h>
-#include <flipper_application/plugins/composite_resolver.h>
 
 #include <nfc/nfc.h>
 #include <nfc/nfc_device.h>
@@ -26,7 +25,7 @@ typedef struct NfcSupportedCards NfcSupportedCards;
  *
  * @return pointer to allocated NfcSupportedCards instance.
  */
-NfcSupportedCards* nfc_supported_cards_alloc(CompositeApiResolver* api_resolver);
+NfcSupportedCards* nfc_supported_cards_alloc(void);
 
 /**
  * @brief Delete an NfcSupportedCards instance
@@ -69,8 +68,7 @@ bool nfc_supported_cards_read(NfcSupportedCards* instance, NfcDevice* device, Nf
  *
  * @param[in, out] instance pointer to NfcSupportedCards instance.
  * @param[in] device pointer to a device instance holding the data is to be parsed.
- * @param[out] parsed_data pointer to the string to contain the formatted result. It is reset
- * before each plugin runs, and its contents are meaningful only when this function returns true.
+ * @param[out] parsed_data pointer to the string to contain the formatted result.
  * @returns true if the card was successfully parsed, false otherwise.
  *
  * @see NfcSupportedCardPluginParse for detailed description.

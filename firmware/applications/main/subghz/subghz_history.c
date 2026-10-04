@@ -1,18 +1,19 @@
 #include "subghz_history.h"
 #include <lib/subghz/receiver.h>
+#include <lib/subghz/protocols/came.h>
 
 #include <furi.h>
 
-#define SUBGHZ_HISTORY_MAX       55
+#define SUBGHZ_HISTORY_MAX       50
 #define SUBGHZ_HISTORY_FREE_HEAP 20480
-#define TAG                      "SubGhzHistory"
+
+#define TAG "SubGhzHistory"
 
 typedef struct {
     FuriString* item_str;
     FlipperFormat* flipper_string;
     uint8_t type;
     SubGhzRadioPreset* preset;
-    DateTime datetime;
 } SubGhzHistoryItem;
 
 ARRAY_DEF(SubGhzHistoryItemArray, SubGhzHistoryItem, M_POD_OPLIST) //-V658
@@ -24,10 +25,9 @@ typedef struct {
 } SubGhzHistoryStruct;
 
 struct SubGhzHistory {
-    uint32_t last_update_air_time;
+    uint32_t last_update_timestamp;
     uint16_t last_index_write;
     uint8_t code_last_hash_data;
-    bool code_last_hash_data_set;
     FuriString* tmp_string;
     SubGhzHistoryStruct* history;
 };
@@ -88,23 +88,6 @@ void subghz_history_reset(SubGhzHistory* instance) {
     SubGhzHistoryItemArray_reset(instance->history->data);
     instance->last_index_write = 0;
     instance->code_last_hash_data = 0;
-    instance->code_last_hash_data_set = false;
-    instance->last_update_air_time = 0;
-}
-
-void subghz_history_delete_item(SubGhzHistory* instance, uint16_t idx) {
-    furi_assert(instance);
-
-    if(idx < SubGhzHistoryItemArray_size(instance->history->data)) {
-        SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
-        furi_string_free(item->item_str);
-        furi_string_free(item->preset->name);
-        free(item->preset);
-        flipper_format_free(item->flipper_string);
-        item->type = 0;
-        SubGhzHistoryItemArray_remove_v(instance->history->data, idx, idx + 1);
-        instance->last_index_write--;
-    }
 }
 
 uint16_t subghz_history_get_item(SubGhzHistory* instance) {
@@ -121,27 +104,12 @@ uint8_t subghz_history_get_type_protocol(SubGhzHistory* instance, uint16_t idx) 
 const char* subghz_history_get_protocol_name(SubGhzHistory* instance, uint16_t idx) {
     furi_assert(instance);
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
-    if(!item || !item->flipper_string) {
-        FURI_LOG_E(TAG, "Missing Item");
-        furi_string_reset(instance->tmp_string);
-        return furi_string_get_cstr(instance->tmp_string);
-    }
     flipper_format_rewind(item->flipper_string);
     if(!flipper_format_read_string(item->flipper_string, "Protocol", instance->tmp_string)) {
         FURI_LOG_E(TAG, "Missing Protocol");
         furi_string_reset(instance->tmp_string);
     }
     return furi_string_get_cstr(instance->tmp_string);
-}
-
-DateTime subghz_history_get_datetime(SubGhzHistory* instance, uint16_t idx) {
-    furi_assert(instance);
-    SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
-    if(item) {
-        return item->datetime;
-    } else {
-        return (DateTime){};
-    }
 }
 
 FlipperFormat* subghz_history_get_raw_data(SubGhzHistory* instance, uint16_t idx) {
@@ -156,11 +124,11 @@ FlipperFormat* subghz_history_get_raw_data(SubGhzHistory* instance, uint16_t idx
 bool subghz_history_get_text_space_left(SubGhzHistory* instance, FuriString* output) {
     furi_assert(instance);
     if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) {
-        if(output != NULL) furi_string_printf(output, "  RAM almost FULL");
+        if(output != NULL) furi_string_printf(output, "  Мало памяти");
         return true;
     }
     if(instance->last_index_write == SUBGHZ_HISTORY_MAX) {
-        if(output != NULL) furi_string_printf(output, "   Memory is FULL");
+        if(output != NULL) furi_string_printf(output, "  Память заполнена");
         return true;
     }
     if(output != NULL)
@@ -168,25 +136,15 @@ bool subghz_history_get_text_space_left(SubGhzHistory* instance, FuriString* out
     return false;
 }
 
-uint16_t subghz_history_get_last_index(SubGhzHistory* instance) {
-    return instance->last_index_write;
-}
 void subghz_history_get_text_item_menu(SubGhzHistory* instance, FuriString* output, uint16_t idx) {
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
     furi_string_set(output, item->item_str);
 }
 
-void subghz_history_get_time_item_menu(SubGhzHistory* instance, FuriString* output, uint16_t idx) {
-    SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
-    DateTime* t = &item->datetime;
-    furi_string_printf(output, "%.2d:%.2d:%.2d ", t->hour, t->minute, t->second);
-}
-
 bool subghz_history_add_to_history(
     SubGhzHistory* instance,
     void* context,
-    SubGhzRadioPreset* preset,
-    uint32_t air_time) {
+    SubGhzRadioPreset* preset) {
     furi_assert(instance);
     furi_assert(context);
 
@@ -194,27 +152,18 @@ bool subghz_history_add_to_history(
     if(instance->last_index_write >= SUBGHZ_HISTORY_MAX) return false;
 
     SubGhzProtocolDecoderBase* decoder_base = context;
-    uint8_t code_hash_data = subghz_protocol_decoder_base_get_hash_data(decoder_base);
-    //the "have we seen anything at all" flag matters: without it a signal whose hash is
-    //zero would match the value the filter starts out with and never reach the history
-    //
-    //the window is measured in air time, not wall time. a transmitter repeats its frame
-    //for as long as the button is held, and the decoders only report a frame once they
-    //see the gap that ends it - for the last repeat of a burst that gap is the silence
-    //afterwards, which is not measured until the receiver picks up an edge again, so the
-    //repeat can be reported seconds after it was actually sent. air time counts what was
-    //decoded, so it puts the repeat right next to the ones before it
-    if(instance->code_last_hash_data_set && (instance->code_last_hash_data == code_hash_data) &&
-       ((air_time - instance->last_update_air_time) < 500)) {
-        instance->last_update_air_time = air_time;
+    if((instance->code_last_hash_data ==
+        subghz_protocol_decoder_base_get_hash_data(decoder_base)) &&
+       ((furi_get_tick() - instance->last_update_timestamp) < 500)) {
+        instance->last_update_timestamp = furi_get_tick();
         return false;
     }
 
-    instance->code_last_hash_data = code_hash_data;
-    instance->code_last_hash_data_set = true;
-    instance->last_update_air_time = air_time;
+    instance->code_last_hash_data = subghz_protocol_decoder_base_get_hash_data(decoder_base);
+    instance->last_update_timestamp = furi_get_tick();
 
-    FuriString* text = furi_string_alloc();
+    FuriString* text;
+    text = furi_string_alloc();
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_push_raw(instance->history->data);
     item->preset = malloc(sizeof(SubGhzRadioPreset));
     item->type = decoder_base->protocol->type;
@@ -223,7 +172,6 @@ bool subghz_history_add_to_history(
     furi_string_set(item->preset->name, preset->name);
     item->preset->data = preset->data;
     item->preset->data_size = preset->data_size;
-    furi_hal_rtc_get_datetime(&item->datetime);
 
     item->item_str = furi_string_alloc();
     item->flipper_string = flipper_format_string_alloc();
@@ -240,6 +188,13 @@ bool subghz_history_add_to_history(
         }
         if(!strcmp(furi_string_get_cstr(instance->tmp_string), "KeeLoq")) {
             furi_string_set(instance->tmp_string, "KL ");
+            if(!flipper_format_read_string(item->flipper_string, "Manufacture", text)) {
+                FURI_LOG_E(TAG, "Missing Protocol");
+                break;
+            }
+            furi_string_cat(instance->tmp_string, text);
+        } else if(!strcmp(furi_string_get_cstr(instance->tmp_string), "Star Line")) {
+            furi_string_set(instance->tmp_string, "SL ");
             if(!flipper_format_read_string(item->flipper_string, "Manufacture", text)) {
                 FURI_LOG_E(TAG, "Missing Protocol");
                 break;

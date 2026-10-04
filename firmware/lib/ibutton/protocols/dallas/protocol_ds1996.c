@@ -5,6 +5,8 @@
 
 #include "dallas_common.h"
 
+#include "../blanks/tm2004.h"
+
 #define DS1996_FAMILY_CODE 0x0CU
 #define DS1996_FAMILY_NAME "DS1996"
 
@@ -29,6 +31,7 @@ typedef struct {
 } DS1996ProtocolData;
 
 static bool dallas_ds1996_read(OneWireHost*, void*);
+static bool dallas_ds1996_write_id(OneWireHost*, iButtonProtocolData*);
 static bool dallas_ds1996_write_copy(OneWireHost*, iButtonProtocolData*);
 static void dallas_ds1996_emulate(OneWireSlave*, iButtonProtocolData*);
 static bool dallas_ds1996_load(FlipperFormat*, uint32_t, iButtonProtocolData*);
@@ -43,13 +46,14 @@ static void dallas_ds1996_apply_edits(iButtonProtocolData*);
 
 const iButtonProtocolDallasBase ibutton_protocol_ds1996 = {
     .family_code = DS1996_FAMILY_CODE,
-    .features = iButtonProtocolFeatureExtData | iButtonProtocolFeatureWriteCopy,
-    .write_targets = IBUTTON_WRITE_TARGET_BIT(iButtonWriteTargetTM2004),
+    .features = iButtonProtocolFeatureExtData | iButtonProtocolFeatureWriteId |
+                iButtonProtocolFeatureWriteCopy,
     .data_size = sizeof(DS1996ProtocolData),
     .manufacturer = DALLAS_COMMON_MANUFACTURER_NAME,
     .name = DS1996_FAMILY_NAME,
 
     .read = dallas_ds1996_read,
+    .write_id = dallas_ds1996_write_id,
     .write_copy = dallas_ds1996_write_copy,
     .emulate = dallas_ds1996_emulate,
     .save = dallas_ds1996_save,
@@ -81,6 +85,11 @@ bool dallas_ds1996_read(OneWireHost* host, iButtonProtocolData* protocol_data) {
 
     onewire_host_set_overdrive(host, false);
     return success;
+}
+
+bool dallas_ds1996_write_id(OneWireHost* host, iButtonProtocolData* protocol_data) {
+    DS1996ProtocolData* data = protocol_data;
+    return tm2004_write(host, data->rom_data.bytes, sizeof(DallasCommonRomData));
 }
 
 bool dallas_ds1996_write_copy(OneWireHost* host, iButtonProtocolData* protocol_data) {
@@ -217,7 +226,7 @@ void dallas_ds1996_render_uid(FuriString* result, const iButtonProtocolData* pro
 void dallas_ds1996_render_data(FuriString* result, const iButtonProtocolData* protocol_data) {
     const DS1996ProtocolData* data = protocol_data;
 
-    furi_string_cat_printf(result, "\e#Memory Data\n--------------------\n");
+    furi_string_cat_printf(result, "\e#Данные памяти\n--------------------\n");
 
     pretty_format_bytes_hex_canonical(
         result,

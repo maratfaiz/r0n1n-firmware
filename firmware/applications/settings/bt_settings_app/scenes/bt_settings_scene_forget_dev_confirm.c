@@ -1,6 +1,5 @@
 #include "../bt_settings_app.h"
 #include <furi_hal_bt.h>
-#include <storage/storage.h>
 
 void bt_settings_scene_forget_dev_confirm_dialog_callback(DialogExResult result, void* context) {
     furi_assert(context);
@@ -11,11 +10,10 @@ void bt_settings_scene_forget_dev_confirm_dialog_callback(DialogExResult result,
 void bt_settings_scene_forget_dev_confirm_on_enter(void* context) {
     BtSettingsApp* app = context;
     DialogEx* dialog = app->dialog;
-    dialog_ex_set_header(dialog, "Unpair All Devices?", 64, 0, AlignCenter, AlignTop);
-    dialog_ex_set_text(
-        dialog, "All previous pairings\nwill be lost!", 64, 14, AlignCenter, AlignTop);
-    dialog_ex_set_left_button_text(dialog, "Cancel");
-    dialog_ex_set_right_button_text(dialog, "Unpair");
+    dialog_ex_set_header(dialog, "Забыть все?", 64, 0, AlignCenter, AlignTop);
+    dialog_ex_set_text(dialog, "Все сопряжения\nбудут удалены!", 64, 14, AlignCenter, AlignTop);
+    dialog_ex_set_left_button_text(dialog, "Отмена");
+    dialog_ex_set_right_button_text(dialog, "Забыть");
     dialog_ex_set_context(dialog, app);
     dialog_ex_set_result_callback(dialog, bt_settings_scene_forget_dev_confirm_dialog_callback);
 
@@ -30,16 +28,7 @@ bool bt_settings_scene_forget_dev_confirm_on_event(void* context, SceneManagerEv
         if(event.event == DialogExResultLeft) {
             consumed = scene_manager_previous_scene(app->scene_manager);
         } else if(event.event == DialogExResultRight) {
-            bt_keys_storage_set_default_path(app->bt);
             bt_forget_bonded_devices(app->bt);
-
-            // Also remove keys of BadBT, Bluetooth Remote, TOTP Authenticator
-            Storage* storage = furi_record_open(RECORD_STORAGE);
-            storage_simply_remove(storage, EXT_PATH("badbt/.badbt.keys"));
-            storage_simply_remove(storage, EXT_PATH("apps_data/hid_ble/.bt_hid.keys"));
-            storage_simply_remove(storage, EXT_PATH("authenticator/.bt_hid.keys"));
-            furi_record_close(RECORD_STORAGE);
-
             scene_manager_next_scene(app->scene_manager, BtSettingsAppSceneForgetDevSuccess);
             consumed = true;
         }

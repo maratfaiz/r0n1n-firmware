@@ -4,10 +4,9 @@
 struct SubGhzEnvironment {
     SubGhzKeystore* keystore;
     const SubGhzProtocolRegistry* protocol_registry;
+    const char* came_atomo_rainbow_table_file_name;
     const char* nice_flor_s_rainbow_table_file_name;
     const char* alutech_at_4n_rainbow_table_file_name;
-    const char* mfname;
-    uint8_t kl_type;
 };
 
 SubGhzEnvironment* subghz_environment_alloc(void) {
@@ -15,10 +14,9 @@ SubGhzEnvironment* subghz_environment_alloc(void) {
 
     instance->keystore = subghz_keystore_alloc();
     instance->protocol_registry = NULL;
+    instance->came_atomo_rainbow_table_file_name = NULL;
     instance->nice_flor_s_rainbow_table_file_name = NULL;
     instance->alutech_at_4n_rainbow_table_file_name = NULL;
-    instance->mfname = "";
-    instance->kl_type = 0;
 
     return instance;
 }
@@ -27,6 +25,7 @@ void subghz_environment_free(SubGhzEnvironment* instance) {
     furi_check(instance);
 
     instance->protocol_registry = NULL;
+    instance->came_atomo_rainbow_table_file_name = NULL;
     instance->nice_flor_s_rainbow_table_file_name = NULL;
     instance->alutech_at_4n_rainbow_table_file_name = NULL;
     subghz_keystore_free(instance->keystore);
@@ -49,17 +48,16 @@ SubGhzKeystore* subghz_environment_get_keystore(SubGhzEnvironment* instance) {
 void subghz_environment_set_came_atomo_rainbow_table_file_name(
     SubGhzEnvironment* instance,
     const char* filename) {
-    UNUSED(instance);
-    UNUSED(filename);
-    // Do nothing :)
-    return;
+    furi_check(instance);
+
+    instance->came_atomo_rainbow_table_file_name = filename;
 }
 
 const char*
     subghz_environment_get_came_atomo_rainbow_table_file_name(SubGhzEnvironment* instance) {
-    UNUSED(instance);
-    // No table, sorry
-    return "";
+    furi_check(instance);
+
+    return instance->came_atomo_rainbow_table_file_name;
 }
 
 void subghz_environment_set_alutech_at_4n_rainbow_table_file_name(
@@ -118,10 +116,4 @@ const char*
     } else {
         return NULL;
     }
-}
-
-void subghz_environment_reset_keeloq(SubGhzEnvironment* instance) {
-    furi_assert(instance);
-
-    subghz_keystore_reset_kl(instance->keystore);
 }

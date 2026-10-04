@@ -9,7 +9,7 @@ void nfc_scene_des_auth_unlock_warn_dialog_callback(DialogExResult result, void*
 void nfc_scene_des_auth_unlock_warn_on_enter(void* context) {
     NfcApp* nfc = context;
 
-    const char* message = "Risky Action!";
+    const char* message = "Опасное действие!";
     DialogEx* dialog_ex = nfc->dialog_ex;
     dialog_ex_set_context(dialog_ex, nfc);
     dialog_ex_set_result_callback(dialog_ex, nfc_scene_des_auth_unlock_warn_dialog_callback);
@@ -17,18 +17,11 @@ void nfc_scene_des_auth_unlock_warn_on_enter(void* context) {
     dialog_ex_set_header(dialog_ex, message, 64, 0, AlignCenter, AlignTop);
 
     FuriString* str = furi_string_alloc();
-    furi_string_cat_printf(str, "Unlock with key: ");
+    furi_string_cat_printf(str, "Ключ для разблок.: ");
 
     NfcProtocol protocol = nfc_device_get_protocol(nfc->nfc_device);
-    uint8_t* key;
-    if(protocol == NfcProtocolFelica) {
-        key = nfc->felica_auth->card_key.data;
-    } else {
-        const MfUltralightData* data =
-            nfc_device_get_data(nfc->nfc_device, NfcProtocolMfUltralight);
-        key = (data->type == MfUltralightTypeUltralightAES) ? nfc->mf_ul_auth->aes_key.data :
-                                                              nfc->mf_ul_auth->tdes_key.data;
-    }
+    uint8_t* key = (protocol == NfcProtocolFelica) ? nfc->felica_auth->card_key.data :
+                                                     nfc->mf_ul_auth->tdes_key.data;
 
     for(uint8_t i = 0; i < FELICA_DATA_BLOCK_SIZE; i++)
         furi_string_cat_printf(str, "%02X ", key[i]);
@@ -39,8 +32,8 @@ void nfc_scene_des_auth_unlock_warn_on_enter(void* context) {
 
     dialog_ex_set_text(dialog_ex, nfc->text_store, 0, 12, AlignLeft, AlignTop);
 
-    dialog_ex_set_left_button_text(dialog_ex, "Cancel");
-    dialog_ex_set_right_button_text(dialog_ex, "Unlock");
+    dialog_ex_set_left_button_text(dialog_ex, "Отмена");
+    dialog_ex_set_right_button_text(dialog_ex, "Разблокировать");
 
     view_dispatcher_switch_to_view(nfc->view_dispatcher, NfcViewDialogEx);
 }

@@ -30,30 +30,17 @@ static void desktop_scene_main_interact_animation_callback(void* context) {
         desktop->view_dispatcher, DesktopAnimationEventInteractAnimation);
 }
 
-static inline bool desktop_scene_main_check_none(const char* str) {
-    return (str[1] == '\0' && str[0] == '?');
-}
-
 static void desktop_scene_main_open_app_or_profile(Desktop* desktop, FavoriteApp* application) {
-    bool load_ok = false;
     if(strlen(application->name_or_path) > 0) {
-        if(!desktop_scene_main_check_none(application->name_or_path)) {
-            // Load app
-            loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
-        }
-        load_ok = true;
-    }
-    // In case of "default" setting
-    if(!load_ok) {
+        loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
+    } else {
         loader_start_detached_with_gui_error(desktop->loader, "Passport", NULL);
     }
 }
 
 static void desktop_scene_main_start_favorite(Desktop* desktop, FavoriteApp* application) {
     if(strlen(application->name_or_path) > 0) {
-        if(!desktop_scene_main_check_none(application->name_or_path)) {
-            loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
-        }
+        loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
     } else {
         loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, NULL);
     }
@@ -83,7 +70,14 @@ void desktop_scene_main_on_enter(void* context) {
     // for the first second, then keep it ticking while this scene is shown.
     DateTime datetime;
     furi_hal_rtc_get_datetime(&datetime);
-    desktop_main_update_dashboard(main_view, &datetime, DASHBOARD_DEFAULT_PROFILE_NAME);
+    const uint8_t wp =
+        desktop->r0n1n.wallpaper < r0n1n_wallpapers_count ? desktop->r0n1n.wallpaper : 0;
+    desktop_main_update_dashboard(
+        main_view,
+        &datetime,
+        r0n1n_profiles[desktop->r0n1n.profile].name,
+        furi_hal_power_get_pct(),
+        r0n1n_wallpapers[wp].icon);
     furi_timer_start(desktop->dashboard_update_timer, furi_ms_to_ticks(1000));
 
     view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdMain);
@@ -95,15 +89,12 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
-        case DesktopMainEventOpenMenu: {
-            Loader* loader = furi_record_open(RECORD_LOADER);
-            loader_show_menu(loader);
-            furi_record_close(RECORD_LOADER);
+        case DesktopMainEventOpenMenu:
+            scene_manager_next_scene(desktop->scene_manager, DesktopSceneMenu);
             consumed = true;
-        } break;
+            break;
 
         case DesktopMainEventLock:
-            scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneLockMenu, 0);
             desktop_lock(desktop);
             consumed = true;
             break;
@@ -125,6 +116,33 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
         case DesktopMainEventOpenRecent:
             scene_manager_next_scene(desktop->scene_manager, DesktopSceneRecent);
+            consumed = true;
+            break;
+
+        case DesktopMainEventOpenControlCenter:
+            scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneControlCenter, 0);
+            scene_manager_next_scene(desktop->scene_manager, DesktopSceneControlCenter);
+            consumed = true;
+            break;
+
+        case DesktopMainEventOpenSectionsLeft:
+        case DesktopMainEventOpenSectionsRight:
+            // Like swiping: Right starts at the first section, Left at the last.
+            scene_manager_set_scene_state(
+                desktop->scene_manager,
+                DesktopSceneSections,
+                event.event == DesktopMainEventOpenSectionsLeft ? UINT32_MAX : 0);
+            scene_manager_next_scene(desktop->scene_manager, DesktopSceneSections);
+            consumed = true;
+            break;
+
+        case DesktopMainEventOpenSearch:
+            desktop_r0n1n_open_search(desktop);
+            consumed = true;
+            break;
+
+        case DesktopMainEventOpenSimpleMenu:
+            scene_manager_next_scene(desktop->scene_manager, DesktopSceneSimpleMenu);
             consumed = true;
             break;
 
@@ -154,6 +172,7 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
                 desktop, &desktop->settings.favorite_apps[FavoriteAppRightLong]);
             consumed = true;
             break;
+
         case DesktopAnimationEventCheckAnimation:
             animation_manager_check_blocking_process(desktop->animation_manager);
             consumed = true;
@@ -169,7 +188,7 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
                         desktop, &desktop->settings.favorite_apps[FavoriteAppRightShort]);
                 } else {
                     desktop_scene_main_open_app_or_profile(
-                        desktop, &desktop->settings.dummy_apps[DummyAppRightShort]);
+                        desktop, &desktop->settings.dummy_apps[DummyAppRight]);
                 }
             }
             consumed = true;
@@ -177,41 +196,15 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
         case DesktopDummyEventOpenLeft:
             desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppLeftShort]);
+                desktop, &desktop->settings.dummy_apps[DummyAppLeft]);
             break;
         case DesktopDummyEventOpenDown:
             desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppDownShort]);
+                desktop, &desktop->settings.dummy_apps[DummyAppDown]);
             break;
         case DesktopDummyEventOpenOk:
             desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppOkShort]);
-            break;
-        case DesktopDummyEventOpenUpLong:
-            if(!desktop_scene_main_check_none(
-                   desktop->settings.dummy_apps[DummyAppUpLong].name_or_path)) {
-                desktop_scene_main_open_app_or_profile(
-                    desktop, &desktop->settings.dummy_apps[DummyAppUpLong]);
-            } else {
-                scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneLockMenu, 0);
-                desktop_lock(desktop);
-            }
-            break;
-        case DesktopDummyEventOpenDownLong:
-            desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppDownLong]);
-            break;
-        case DesktopDummyEventOpenLeftLong:
-            desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppLeftLong]);
-            break;
-        case DesktopDummyEventOpenRightLong:
-            desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppRightLong]);
-            break;
-        case DesktopDummyEventOpenOkLong:
-            desktop_scene_main_open_app_or_profile(
-                desktop, &desktop->settings.dummy_apps[DummyAppOkLong]);
+                desktop, &desktop->settings.dummy_apps[DummyAppOk]);
             break;
 
         case DesktopLockedEventUpdate:

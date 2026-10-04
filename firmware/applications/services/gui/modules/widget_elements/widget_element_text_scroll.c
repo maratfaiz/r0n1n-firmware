@@ -1,5 +1,6 @@
 #include "widget_element_i.h"
 #include <gui/elements.h>
+#include <gui/utf8_i.h>
 #include <m-array.h>
 
 #define WIDGET_ELEMENT_TEXT_SCROLL_BAR_OFFSET (4)
@@ -100,7 +101,10 @@ static void widget_element_text_scroll_fill_lines(Canvas* canvas, WidgetElement*
                 reached_new_line = true;
                 break;
             } else {
-                line_width += canvas_glyph_width(canvas, next_char);
+                uint16_t code;
+                const char* at = furi_string_get_cstr(model->text) + char_i - 1;
+                size_t len = gui_utf8_char(at, &code);
+                line_width += canvas_glyph_width(canvas, code);
                 if(line_width > model->width) {
                     furi_string_push_back(line_tmp.text, '\0');
                     widget_element_text_scroll_add_line(element, &line_tmp);
@@ -110,7 +114,11 @@ static void widget_element_text_scroll_fill_lines(Canvas* canvas, WidgetElement*
                     reached_new_line = false;
                     break;
                 } else {
-                    furi_string_push_back(line_tmp.text, next_char);
+                    // The whole character, however many bytes it takes
+                    for(size_t b = 0; b < len; b++) {
+                        furi_string_push_back(line_tmp.text, at[b]);
+                    }
+                    char_i += len - 1;
                 }
             }
         }

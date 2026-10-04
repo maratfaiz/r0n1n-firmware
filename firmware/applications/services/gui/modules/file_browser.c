@@ -1,6 +1,5 @@
 #include "file_browser.h"
 #include "file_browser_worker.h"
-#include "file_browser_worker_i.h"
 
 #include <gui/elements.h>
 #include <assets_icons.h>
@@ -12,7 +11,6 @@
 #include <core/check.h>
 #include <core/common_defines.h>
 #include <core/log.h>
-#include "m-algo.h"
 #include <m-array.h>
 
 #define LIST_ITEMS   5u
@@ -35,25 +33,22 @@ typedef enum {
 } BrowserItemType;
 
 typedef struct {
-    uint32_t unsorted_idx;
-    FuriString* name;
+    FuriString* path;
     BrowserItemType type;
     uint8_t* custom_icon_data;
     FuriString* display_name;
 } BrowserItem_t;
 
 static void BrowserItem_t_init(BrowserItem_t* obj) {
-    obj->unsorted_idx = 0;
     obj->type = BrowserItemTypeLoading;
-    obj->name = furi_string_alloc();
+    obj->path = furi_string_alloc();
     obj->display_name = furi_string_alloc();
     obj->custom_icon_data = NULL;
 }
 
 static void BrowserItem_t_init_set(BrowserItem_t* obj, const BrowserItem_t* src) {
-    obj->unsorted_idx = src->unsorted_idx;
     obj->type = src->type;
-    obj->name = furi_string_alloc_set(src->name);
+    obj->path = furi_string_alloc_set(src->path);
     obj->display_name = furi_string_alloc_set(src->display_name);
     if(src->custom_icon_data) {
         obj->custom_icon_data = malloc(CUSTOM_ICON_MAX_SIZE);
@@ -64,9 +59,8 @@ static void BrowserItem_t_init_set(BrowserItem_t* obj, const BrowserItem_t* src)
 }
 
 static void BrowserItem_t_set(BrowserItem_t* obj, const BrowserItem_t* src) {
-    obj->unsorted_idx = src->unsorted_idx;
     obj->type = src->type;
-    furi_string_set(obj->name, src->name);
+    furi_string_set(obj->path, src->path);
     furi_string_set(obj->display_name, src->display_name);
     if(src->custom_icon_data) {
         memcpy(obj->custom_icon_data, src->custom_icon_data, CUSTOM_ICON_MAX_SIZE);
@@ -76,43 +70,20 @@ static void BrowserItem_t_set(BrowserItem_t* obj, const BrowserItem_t* src) {
 }
 
 static void BrowserItem_t_clear(BrowserItem_t* obj) {
-    furi_string_free(obj->name);
+    furi_string_free(obj->path);
     furi_string_free(obj->display_name);
     if(obj->custom_icon_data) {
         free(obj->custom_icon_data);
     }
 }
 
-static int BrowserItem_t_cmp(const BrowserItem_t* a, const BrowserItem_t* b) {
-    // Back indicator comes before everything, then folders, then all other files.
-    if(a->type == BrowserItemTypeBack) {
-        return -1;
-    }
-    if(b->type == BrowserItemTypeBack) {
-        return 1;
-    }
-    if(a->type == BrowserItemTypeFolder && b->type != BrowserItemTypeFolder) {
-        return -1;
-    }
-    if(a->type != BrowserItemTypeFolder && b->type == BrowserItemTypeFolder) {
-        return 1;
-    }
-
-    return furi_string_cmpi(a->name, b->name);
-}
-
-#define M_OPL_BrowserItem_t()                 \
-    (INIT(API_2(BrowserItem_t_init)),         \
-     SET(API_6(BrowserItem_t_set)),           \
-     INIT_SET(API_6(BrowserItem_t_init_set)), \
-     CLEAR(API_2(BrowserItem_t_clear)),       \
-     CMP(API_6(BrowserItem_t_cmp)),           \
-     SWAP(M_SWAP_DEFAULT),                    \
-     EQUAL(API_6(M_EQUAL_DEFAULT)))
-
-ARRAY_DEF(items_array, BrowserItem_t)
-
-ALGO_DEF(items_array, ARRAY_OPLIST(items_array, M_OPL_BrowserItem_t()))
+ARRAY_DEF(
+    items_array,
+    BrowserItem_t,
+    (INIT(API_2(BrowserItem_t_init)),
+     SET(API_6(BrowserItem_t_set)),
+     INIT_SET(API_6(BrowserItem_t_init_set)),
+     CLEAR(API_2(BrowserItem_t_clear))))
 
 struct FileBrowser {
     View* view;
@@ -164,12 +135,8 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context);
 static void
     browser_folder_open_cb(void* context, uint32_t item_cnt, int32_t file_idx, bool is_root);
 static void browser_list_load_cb(void* context, uint32_t list_load_offset);
-static void browser_list_item_cb(
-    void* context,
-    FuriString* item_path,
-    uint32_t idx,
-    bool is_folder,
-    bool is_last);
+static void
+    browser_list_item_cb(void* context, FuriString* item_path, bool is_folder, bool is_last);
 static void browser_long_load_cb(void* context);
 
 static void file_browser_scroll_timer_callback(void* context) {
@@ -338,6 +305,12 @@ static bool browser_is_list_load_required(FileBrowserModel* model) {
     return false;
 }
 
+static void browser_list_rollover(FileBrowserModel* model) {
+    if(!model->list_loading && items_array_size(model->items) < model->item_cnt) {
+        items_array_reset(model->items);
+    }
+}
+
 static void browser_update_offset(FileBrowser* browser) {
     furi_check(browser);
 
@@ -360,7 +333,7 @@ static void browser_update_offset(FileBrowser* browser) {
                     CLAMP(model->item_idx - 1, (int32_t)model->item_cnt - bounds, 0);
             }
         },
-        true);
+        false);
 }
 
 static void
@@ -392,7 +365,7 @@ static void
             model->list_loading = true;
             model->folder_loading = false;
         },
-        false);
+        true);
     browser_update_offset(browser);
 
     file_browser_worker_load(browser->worker, load_offset, ITEM_LIST_LEN_MAX);
@@ -420,27 +393,21 @@ static void browser_list_load_cb(void* context, uint32_t list_load_offset) {
                 }
             }
         },
-        true);
+        false);
 
     BrowserItem_t_clear(&back_item);
 }
 
-static void browser_list_item_cb(
-    void* context,
-    FuriString* item_path,
-    uint32_t idx,
-    bool is_folder,
-    bool is_last) {
+static void
+    browser_list_item_cb(void* context, FuriString* item_path, bool is_folder, bool is_last) {
     furi_check(context);
     FileBrowser* browser = (FileBrowser*)context;
 
     BrowserItem_t item;
     item.custom_icon_data = NULL;
-    item.unsorted_idx = idx;
 
     if(!is_last) {
-        item.name = furi_string_alloc();
-        path_extract_filename(item_path, item.name, false);
+        item.path = furi_string_alloc_set(item_path);
         item.display_name = furi_string_alloc();
         if(is_folder) {
             item.type = BrowserItemTypeFolder;
@@ -466,16 +433,17 @@ static void browser_list_item_cb(
                 (browser->hide_ext) && (item.type == BrowserItemTypeFile));
         }
 
+        // We shouldn't update screen on each item if custom callback is not set
+        // Otherwise it will cause screen flickering
+        bool instant_update = (browser->item_callback != NULL);
         with_view_model(
             browser->view,
             FileBrowserModel * model,
-            {
-                items_array_push_back(model->items, item);
-                // TODO: calculate if element is visible
-            },
-            false);
+            { items_array_push_back(model->items, item); },
+            instant_update);
+
         furi_string_free(item.display_name);
-        furi_string_free(item.name);
+        furi_string_free(item.path);
         if(item.custom_icon_data) {
             free(item.custom_icon_data);
         }
@@ -484,28 +452,15 @@ static void browser_list_item_cb(
             browser->view,
             FileBrowserModel * model,
             {
-                if(model->item_cnt <= BROWSER_SORT_THRESHOLD) {
-                    FuriString* selected = NULL;
-                    if(model->item_idx > 0) {
-                        selected = furi_string_alloc_set(
-                            items_array_get(model->items, model->item_idx)->name);
-                    }
-
-                    items_array_sort(model->items);
-
-                    if(selected != NULL) {
-                        for(uint32_t i = 0; i < model->item_cnt; i++) {
-                            if(!furi_string_cmp(items_array_get(model->items, i)->name, selected)) {
-                                model->item_idx = i;
-                                break;
-                            }
-                        }
-                    }
-                }
                 model->list_loading = false;
+                if(browser_is_list_load_required(model)) {
+                    model->list_loading = true;
+                    int32_t load_offset = CLAMP(
+                        model->item_idx - ITEM_LIST_LEN_MAX / 2, (int32_t)model->item_cnt, 0);
+                    file_browser_worker_load(browser->worker, load_offset, ITEM_LIST_LEN_MAX);
+                }
             },
-            false);
-        browser_update_offset(browser);
+            true);
     }
 }
 
@@ -552,25 +507,19 @@ static void browser_draw_list(Canvas* canvas, FileBrowserModel* model) {
     for(uint32_t i = 0; i < MIN(model->item_cnt, LIST_ITEMS); i++) {
         int32_t idx = CLAMP((uint32_t)(i + model->list_offset), model->item_cnt, 0u);
 
-        BrowserItemType item_type;
+        BrowserItemType item_type = BrowserItemTypeLoading;
         uint8_t* custom_icon_data = NULL;
 
         if(browser_is_item_in_array(model, idx)) {
             BrowserItem_t* item = items_array_get(
                 model->items, CLAMP(idx - model->array_offset, (int32_t)(array_size - 1), 0));
             item_type = item->type;
-            if(model->list_loading && item_type != BrowserItemTypeBack) {
-                furi_string_set(filename, "---");
-                item_type = BrowserItemTypeLoading;
-            } else {
-                furi_string_set(filename, item->display_name);
-                if(item_type == BrowserItemTypeFile) {
-                    custom_icon_data = item->custom_icon_data;
-                }
+            furi_string_set(filename, item->display_name);
+            if(item_type == BrowserItemTypeFile) {
+                custom_icon_data = item->custom_icon_data;
             }
         } else {
             furi_string_set(filename, "---");
-            item_type = BrowserItemTypeLoading;
         }
 
         if(item_type == BrowserItemTypeBack) {
@@ -629,7 +578,7 @@ static void browser_draw_list(Canvas* canvas, FileBrowserModel* model) {
             canvas_height(canvas) / 2,
             AlignCenter,
             AlignCenter,
-            "<Empty>");
+            "<Пусто>");
     }
 
     furi_string_free(filename);
@@ -652,10 +601,7 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
     bool is_loading = false;
 
     with_view_model(
-        browser->view,
-        FileBrowserModel * model,
-        { is_loading = model->folder_loading || model->list_loading; },
-        false);
+        browser->view, FileBrowserModel * model, { is_loading = model->folder_loading; }, false);
 
     if(is_loading) {
         return false;
@@ -678,11 +624,13 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
                         if(model->item_idx < scroll_speed) {
                             model->button_held_for_ticks = 0;
                             model->item_idx = model->item_cnt - 1;
+                            browser_list_rollover(model);
                         } else {
                             model->item_idx =
                                 ((model->item_idx - scroll_speed) + model->item_cnt) %
                                 model->item_cnt;
                         }
+
                         if(browser_is_list_load_required(model)) {
                             model->list_loading = true;
                             int32_t load_offset = CLAMP(
@@ -696,13 +644,14 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
 
                         model->button_held_for_ticks += 1;
                     } else if(event->key == InputKeyDown) {
-                        int32_t count = model->item_cnt;
-                        if(model->item_idx + scroll_speed >= count) {
+                        if(model->item_idx + scroll_speed >= (int32_t)model->item_cnt) {
                             model->button_held_for_ticks = 0;
                             model->item_idx = 0;
+                            browser_list_rollover(model);
                         } else {
                             model->item_idx = (model->item_idx + scroll_speed) % model->item_cnt;
                         }
+
                         if(browser_is_list_load_required(model)) {
                             model->list_loading = true;
                             int32_t load_offset = CLAMP(
@@ -717,7 +666,7 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
                         model->button_held_for_ticks += 1;
                     }
                 },
-                false);
+                true);
             browser_update_offset(browser);
             consumed = true;
         } else if(event->type == InputTypeRelease) {
@@ -738,7 +687,10 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
                     if(browser_is_item_in_array(model, model->item_idx)) {
                         selected_item =
                             items_array_get(model->items, model->item_idx - model->array_offset);
-                        select_index = selected_item->unsorted_idx;
+                        select_index = model->item_idx;
+                        if((!model->is_root) && (select_index > 0)) {
+                            select_index -= 1;
+                        }
                     }
                 },
                 false);
@@ -747,18 +699,10 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
                 if(selected_item->type == BrowserItemTypeBack) {
                     file_browser_worker_folder_exit(browser->worker);
                 } else if(selected_item->type == BrowserItemTypeFolder) {
-                    FuriString* item_path = furi_string_alloc();
-                    path_concat(
-                        file_browser_worker_get_path_current(browser->worker),
-                        furi_string_get_cstr(selected_item->name),
-                        item_path);
-                    file_browser_worker_folder_enter(browser->worker, item_path, select_index);
-                    furi_string_free(item_path);
+                    file_browser_worker_folder_enter(
+                        browser->worker, selected_item->path, select_index);
                 } else if(selected_item->type == BrowserItemTypeFile) {
-                    path_concat(
-                        file_browser_worker_get_path_current(browser->worker),
-                        furi_string_get_cstr(selected_item->name),
-                        browser->result_path);
+                    furi_string_set(browser->result_path, selected_item->path);
                     if(browser->callback) {
                         browser->callback(browser->context);
                     }

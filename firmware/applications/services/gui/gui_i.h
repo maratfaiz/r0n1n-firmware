@@ -51,7 +51,6 @@ struct Gui {
 
     // Layers and Canvas
     bool lockdown;
-    bool lockdown_inhibit;
     bool direct_draw;
     ViewPortArray_t layers[GuiLayerMAX];
     Canvas* canvas;
@@ -86,7 +85,7 @@ void gui_update(Gui* gui);
  */
 void gui_input_events_callback(const void* value, void* ctx);
 
-/** Get count of enabled view ports in layer
+/** Get count of view ports in layer
  *
  * @param      gui        The Gui instance
  * @param[in]  layer      GuiLayer that we want to get count of view ports

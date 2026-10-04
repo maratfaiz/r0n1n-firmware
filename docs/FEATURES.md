@@ -1,61 +1,83 @@
 # Core feature set
 
-Inherited from the Unleashed base, with a UX layer reworked in the style of
-Momentum (see `FIRMWARE_LANDSCAPE.md`). This describes what should work
-"out of the box" — excluding R0N1N's unique differentiators (see
-`UNIQUE_FEATURES.md`) and the security toolkit (see `SECURITY_TOOLKIT.md`).
+Inherited from the official Flipper Zero firmware (release 1.4.3, see
+`FIRMWARE_LANDSCAPE.md`), with R0N1N's UX layer on top. This describes
+what works "out of the box" — excluding R0N1N's unique differentiators
+(see `UNIQUE_FEATURES.md`) and the security toolkit (see
+`SECURITY_TOOLKIT.md`).
+
+Each section lists what the built-in apps do (checked against
+`firmware/applications/`), then what is left to apps from the official
+App Catalog or to later roadmap stages. R0N1N keeps the official API, so
+catalog apps install without an API mismatch (see `ECOSYSTEM.md`).
 
 ## Sub-GHz
 
-Receive/save/replay signals, a frequency and spectrum analyzer (within
-what CC1101 allows — see the "not an SDR" constraint in `HARDWARE.md`),
-fixed-code brute force (lab use only, see `SECURITY_TOOLKIT.md`), the
-extended range and protocols from Unleashed, Subdriving (tagging a signal
-with GPS coordinates), signal playlists. External CC1101 is a first-class
-module, not a second-class citizen.
+**Built in:** read decoded signals and RAW captures, save and replay them,
+add a remote manually, a frequency analyzer (within what CC1101 allows —
+see the "not an SDR" constraint in `HARDWARE.md`), and an external CC1101
+module over GPIO as an alternative radio. Transmission follows the
+official regional restrictions.
+
+**Catalog / later:** brute force (lab use only, see
+`SECURITY_TOOLKIT.md`), Subdriving (tagging a signal with GPS
+coordinates), signal playlists.
 
 ## NFC (13.56 MHz)
 
-Read/save/emulate, dictionary attacks, mfkey32/nested/card-only attacks on
-MIFARE Classic, MIFARE Plus SL3 (AES) from Unleashed, NFC Magic, NFC Maker
+**Built in:** read/save/emulate across ISO 14443-3A/3B/4A/4B, ISO 15693,
+FeliCa, ST25TB, MIFARE Classic/Ultralight/DESFire/Plus and SLIX; MIFARE
+Classic dictionary attack and reader nonce collection for mfkey32; MIFARE
+Ultralight C dictionary attack; parsers for a set of supported
+transit/access cards.
+
+**Catalog / later:** the mfkey32 key recovery itself, NFC Magic, NFC Maker
 (NDEF/vcard).
 
 ## 125 kHz RFID
 
-Read/write/emulate (EM4100/HID Prox/Indala/Cyfral), RFID Fuzzer (lab use).
+**Built in:** read/write/emulate (EM4100, HID Prox, Indala and the other
+official protocols).
+
+**Catalog / later:** RFID Fuzzer (lab use).
 
 ## Infrared
 
-A universal remote built on the IRDB, learning new commands, "turn
-everything off."
+**Built in:** universal remotes built on the IR database, learning new
+commands.
 
 ## iButton / 1-Wire
 
-Read/write/emulate.
+**Built in:** read/write/emulate.
 
-## BadUSB / BadKB
+## BadUSB
 
-DuckyScript plus extensions, USB and BLE HID, VID/PID/name/MAC spoofing, an
-editor/runner with templates, JS-BadUSB (conditionals, loops, GUI, export
-to a virtual disk image).
+**Built in:** DuckyScript over USB and over BLE HID, plus the `badusb`
+module for JS scripts.
 
-## U2F/FIDO + TOTP
+## U2F
 
-Native U2F over USB (from OFW/Unleashed); extending this to FIDO2/passkey
-and TOTP/HOTP is a separate evaluation once its turn comes up in the
-roadmap (compatible community libraries need to be checked before this
-gets promised in the roadmap).
+**Built in:** native U2F over USB. Extending this to FIDO2/passkey and
+TOTP/HOTP is a separate evaluation once its turn comes up in the roadmap.
 
 ## GPIO / Dev
 
-USB-UART/SPI/I2C bridge, SWD/JTAG debugging (DAP Link), an I2C scanner,
-sensors over GPIO/I2C/1-Wire, a basic logic analyzer, GPS NMEA.
+**Built in:** a USB-UART bridge, GPIO control, the JS engine (mJS) with
+GPIO, serial, storage, GUI, notification and BadUSB modules.
+
+**Catalog / later:** SPI/I2C bridges, SWD/JTAG debugging (DAP Link), an
+I2C scanner, sensors, a logic analyzer, GPS NMEA.
 
 ## System capabilities (UX layer)
 
-Control Center, a customizable Home/Desktop, Asset Packs, the keybind
-system, an advanced file manager with virtual disk-image mounting, the JS
-engine as a foundation for scripting (see `UNIQUE_FEATURES.md`).
+**Built in (R0N1N):** the Home dashboard, sections (Left/Right), Control
+Center (Down), Quick Actions (Up), Recent (hold OK), the Applications menu
+(OK), profiles, Global Search (hold Back), the Capture Timeline and a first
+Hub — in Russian, like the stock apps (menus, dialogs, settings,
+card parsers) — see `ROADMAP.md`, `UX_DESIGN.md`.
+
+**Later:** an SD search index, capture tags and export, keybinds, an
+advanced file manager (see `UX_DESIGN.md`, `UNIQUE_FEATURES.md`).
 
 ## Explicitly outside the core feature set (see `HARDWARE.md`)
 

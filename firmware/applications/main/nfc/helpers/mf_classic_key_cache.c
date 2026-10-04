@@ -6,7 +6,7 @@
 #define NFC_APP_KEYS_EXTENSION   ".keys"
 #define NFC_APP_KEY_CACHE_FOLDER "/ext/nfc/.cache"
 
-static const char* mf_classic_key_cache_file_header = "Flipper NFC keys";
+static const char* mf_classic_key_cache_file_header = "Ключи NFC Flipper";
 static const uint32_t mf_classic_key_cache_file_version = 1;
 
 struct MfClassicKeyCache {
@@ -58,7 +58,7 @@ bool mf_classic_key_cache_save(MfClassicKeyCache* instance, const MfClassicData*
                ff, mf_classic_key_cache_file_header, mf_classic_key_cache_file_version))
             break;
         if(!flipper_format_write_string_cstr(
-               ff, "Mifare Classic type", mf_classic_get_device_name(data, NfcDeviceNameTypeShort)))
+               ff, "Тип Mifare Classic", mf_classic_get_device_name(data, NfcDeviceNameTypeShort)))
             break;
         if(!flipper_format_write_hex_uint64(ff, "Key A map", &data->key_a_mask, 1)) break;
         if(!flipper_format_write_hex_uint64(ff, "Key B map", &data->key_b_mask, 1)) break;
@@ -68,13 +68,13 @@ bool mf_classic_key_cache_save(MfClassicKeyCache* instance, const MfClassicData*
         for(size_t i = 0; (i < sector_num) && (key_save_success); i++) {
             MfClassicSectorTrailer* sec_tr = mf_classic_get_sector_trailer_by_sector(data, i);
             if(FURI_BIT(data->key_a_mask, i)) {
-                furi_string_printf(temp_str, "Key A sector %d", i);
+                furi_string_printf(temp_str, "Ключ A сектор %d", i);
                 key_save_success = flipper_format_write_hex(
                     ff, furi_string_get_cstr(temp_str), sec_tr->key_a.data, sizeof(MfClassicKey));
             }
             if(!key_save_success) break;
             if(FURI_BIT(data->key_b_mask, i)) {
-                furi_string_printf(temp_str, "Key B sector %d", i);
+                furi_string_printf(temp_str, "Ключ B сектор %d", i);
                 key_save_success = flipper_format_write_hex(
                     ff, furi_string_get_cstr(temp_str), sec_tr->key_b.data, sizeof(MfClassicKey));
             }
@@ -118,7 +118,7 @@ bool mf_classic_key_cache_load(MfClassicKeyCache* instance, const uint8_t* uid, 
         bool key_read_success = true;
         for(size_t i = 0; (i < MF_CLASSIC_TOTAL_SECTORS_MAX) && (key_read_success); i++) {
             if(FURI_BIT(instance->keys.key_a_mask, i)) {
-                furi_string_printf(temp_str, "Key A sector %d", i);
+                furi_string_printf(temp_str, "Ключ A сектор %d", i);
                 key_read_success = flipper_format_read_hex(
                     ff,
                     furi_string_get_cstr(temp_str),
@@ -127,7 +127,7 @@ bool mf_classic_key_cache_load(MfClassicKeyCache* instance, const uint8_t* uid, 
             }
             if(!key_read_success) break;
             if(FURI_BIT(instance->keys.key_b_mask, i)) {
-                furi_string_printf(temp_str, "Key B sector %d", i);
+                furi_string_printf(temp_str, "Ключ B сектор %d", i);
                 key_read_success = flipper_format_read_hex(
                     ff,
                     furi_string_get_cstr(temp_str),

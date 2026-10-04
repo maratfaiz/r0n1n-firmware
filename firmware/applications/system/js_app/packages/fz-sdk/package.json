@@ -1,13 +1,8 @@
 {
-  "name": "@darkflippers/fz-sdk-ul",
-  "version": "1.0.1",
-  "description": "Type declarations and documentation for native JS modules available on Unleashed Custom Firmware for Flipper Zero",
+  "name": "@flipperdevices/fz-sdk",
+  "version": "1.0.0",
+  "description": "Type declarations and documentation for native JS modules available on Flipper Zero",
   "keywords": [
-    "unleashed",
-    "unleashed firmware",
-    "ul",
-    "darkflippers",
-    "flipper unleashed fw sdk",
     "flipper",
     "flipper zero",
     "framework"
@@ -16,7 +11,7 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DarkFlippers/unleashed-firmware.git",
+    "url": "git+https://github.com/flipperdevices/flipperzero-firmware.git",
     "directory": "applications/system/js_app/packages/fz-sdk"
   },
   "type": "module",

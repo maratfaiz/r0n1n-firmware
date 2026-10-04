@@ -14,6 +14,26 @@
 #include <storage.pb.h>
 #include <flipper.pb.h>
 
+/* R0N1N: the SD card stores printable ASCII and Russian letters in names
+ * (code page 866, see storage_ext.c), so those are allowed over RPC too. */
+static bool rpc_storage_name_supported(const char* path) {
+    if(!path) return false;
+    const char* name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+    for(const uint8_t* s = (const uint8_t*)name; *s;) {
+        if(*s >= ' ' && *s <= '~') {
+            s++;
+        } else if(s[0] == 0xD0 && s[1] >= 0x80 && s[1] <= 0xBF) { // Ѐ..п
+            s += 2;
+        } else if(s[0] == 0xD1 && s[1] >= 0x80 && s[1] <= 0x91) { // р..ё
+            s += 2;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 #define TAG "RpcStorage"
 
 #define MAX_NAME_LENGTH 255
@@ -239,7 +259,7 @@ static bool rpc_system_storage_list_filter(
     bool result = false;
 
     do {
-        if(!path_contains_only_ascii(name)) break;
+        if(!rpc_storage_name_supported(name)) break;
         if(request->filter_max_size) {
             if(fileinfo->size > request->filter_max_size) break;
         }
@@ -421,7 +441,7 @@ static void rpc_system_storage_write_process(const PB_Main* request, void* conte
 
     bool fs_operation_success = true;
 
-    if(!path_contains_only_ascii(request->content.storage_write_request.path)) {
+    if(!rpc_storage_name_supported(request->content.storage_write_request.path)) {
         rpc_storage->current_command_id = request->command_id;
         rpc_send_and_release_empty(
             session, rpc_storage->current_command_id, PB_CommandStatus_ERROR_STORAGE_INVALID_NAME);
@@ -487,7 +507,7 @@ static bool rpc_system_storage_is_dir_is_empty(Storage* storage, const char* pat
         if(storage_dir_open(dir, path)) {
             char* name = malloc(MAX_NAME_LENGTH);
             while(storage_dir_read(dir, &fileinfo, name, MAX_NAME_LENGTH)) {
-                if(path_contains_only_ascii(name)) {
+                if(rpc_storage_name_supported(name)) {
                     is_dir_is_empty = false;
                     break;
                 }
@@ -556,7 +576,7 @@ static void rpc_system_storage_mkdir_process(const PB_Main* request, void* conte
 
     char* path = request->content.storage_mkdir_request.path;
     if(path) {
-        if(path_contains_only_ascii(path)) {
+        if(rpc_storage_name_supported(path)) {
             FS_Error error = storage_common_mkdir(rpc_storage->api, path);
             status = rpc_system_storage_get_error(error);
         } else {
@@ -628,7 +648,7 @@ static void rpc_system_storage_rename_process(const PB_Main* request, void* cont
     PB_CommandStatus status;
     rpc_system_storage_reset_state(rpc_storage, session, true);
 
-    if(path_contains_only_ascii(request->content.storage_rename_request.new_path)) {
+    if(rpc_storage_name_supported(request->content.storage_rename_request.new_path)) {
         FS_Error error = storage_common_rename(
             rpc_storage->api,
             request->content.storage_rename_request.old_path,
@@ -700,7 +720,7 @@ static void rpc_system_storage_tar_extract_process(const PB_Main* request, void*
     do {
         const char *tar_path = request->content.storage_tar_extract_request.tar_path,
                    *out_path = request->content.storage_tar_extract_request.out_path;
-        if(!path_contains_only_ascii(out_path)) {
+        if(!rpc_storage_name_supported(out_path)) {
             status = PB_CommandStatus_ERROR_STORAGE_INVALID_NAME;
             break;
         }

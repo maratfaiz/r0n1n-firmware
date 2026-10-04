@@ -1,6 +1,8 @@
 #include "../archive_i.h"
+#include "../helpers/archive_files.h"
 #include "../helpers/archive_apps.h"
 #include "../helpers/archive_browser.h"
+#include "toolbox/path.h"
 
 #define SCENE_DELETE_CUSTOM_EVENT (0UL)
 #define MAX_TEXT_INPUT_LEN        22
@@ -18,9 +20,9 @@ void archive_scene_delete_on_enter(void* context) {
     ArchiveApp* app = (ArchiveApp*)context;
 
     widget_add_button_element(
-        app->widget, GuiButtonTypeLeft, "Cancel", archive_scene_delete_widget_callback, app);
+        app->widget, GuiButtonTypeLeft, "Отмена", archive_scene_delete_widget_callback, app);
     widget_add_button_element(
-        app->widget, GuiButtonTypeRight, "Delete", archive_scene_delete_widget_callback, app);
+        app->widget, GuiButtonTypeRight, "Удалить", archive_scene_delete_widget_callback, app);
 
     FuriString* filename;
     filename = furi_string_alloc();
@@ -35,7 +37,7 @@ void archive_scene_delete_on_enter(void* context) {
     path_extract_filename(current->path, filename, false);
 
     char delete_str[64];
-    snprintf(delete_str, sizeof(delete_str), "\e#Delete %s?\e#", furi_string_get_cstr(filename));
+    snprintf(delete_str, sizeof(delete_str), "\e#Удалить %s?\e#", furi_string_get_cstr(filename));
     widget_add_text_box_element(
         app->widget, 0, 0, 128, 23, AlignCenter, AlignCenter, delete_str, false);
 
@@ -54,16 +56,11 @@ bool archive_scene_delete_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == GuiButtonTypeRight) {
-            // Show loading popup on delete
-            view_dispatcher_switch_to_view(app->view_dispatcher, ArchiveViewStack);
-            archive_show_loading_popup(app, true);
-
             if(selected->is_app) {
                 archive_app_delete_file(browser, name);
             } else {
                 archive_delete_file(browser, "%s", name);
             }
-            archive_show_loading_popup(app, false);
             archive_show_file_menu(browser, false);
             return scene_manager_previous_scene(app->scene_manager);
         } else if(event.event == GuiButtonTypeLeft) {

@@ -289,7 +289,7 @@ static void protocol_nexwatch_render_data_internal(
         furi_string_printf(
             result,
             "ID: %lu\n"
-            "Mode: %hhu; Type: %s",
+            "Режим: %hhu; Тип: %s",
             id,
             mode,
             type);
@@ -297,8 +297,8 @@ static void protocol_nexwatch_render_data_internal(
         furi_string_printf(
             result,
             "ID: %lu\n"
-            "Mode: %hhu\n"
-            "Type: %s",
+            "Режим: %hhu\n"
+            "Тип: %s",
             id,
             mode,
             type);

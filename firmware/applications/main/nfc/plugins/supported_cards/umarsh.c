@@ -24,13 +24,15 @@
  */
 
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
 
 #include "protocols/mf_classic/mf_classic.h"
+#include <flipper_application/flipper_application.h>
 
-#include <bit_lib.h>
-#include <datetime.h>
-#include <locale/locale.h>
+#include <nfc/nfc_device.h>
+#include <bit_lib/bit_lib.h>
+#include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
+
+#include <datetime/datetime.h>
 
 #define TAG "Umarsh"
 
@@ -92,22 +94,9 @@ static bool umarsh_parse(const NfcDevice* device, FuriString* parsed_data) {
         bool is_last_refill_datetime_valid =
             parse_datetime(last_refill_date, &last_refill_datetime);
 
-        LocaleDateFormat date_format = locale_get_date_format();
-        const char* separator = (date_format == LocaleDateFormatDMY) ? "." : "/";
-
-        FuriString* expiry_datetime_str = furi_string_alloc();
-        locale_format_date(expiry_datetime_str, &expiry_datetime, date_format, separator);
-
-        FuriString* valid_to_datetime_str = furi_string_alloc();
-        locale_format_date(valid_to_datetime_str, &valid_to_datetime, date_format, separator);
-
-        FuriString* last_refill_datetime_str = furi_string_alloc();
-        locale_format_date(
-            last_refill_datetime_str, &last_refill_datetime, date_format, separator);
-
         furi_string_cat_printf(
             parsed_data,
-            "\e#Umarsh\nCard number: %lu\nRegion: %02u\nTerminal number: %lu\nRefill counter: %u\nBalance: %u.%02u RUR",
+            "\e#Умарш\nНомер карты: %lu\nРегион: %02u\nНомер терминала: %lu\nПополнений: %u\nБаланс: %u.%02u руб",
             card_number,
             region_number,
             terminal_number,
@@ -117,17 +106,25 @@ static bool umarsh_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         if(is_expiry_datetime_valid)
             furi_string_cat_printf(
-                parsed_data, "\nExpires: %s", furi_string_get_cstr(expiry_datetime_str));
+                parsed_data,
+                "\nИстекает: %02u.%02u.%u",
+                expiry_datetime.day,
+                expiry_datetime.month,
+                expiry_datetime.year);
         if(is_valid_to_datetime_valid)
             furi_string_cat_printf(
-                parsed_data, "\nValid to: %s", furi_string_get_cstr(valid_to_datetime_str));
+                parsed_data,
+                "\nДействует до: %02u.%02u.%u",
+                valid_to_datetime.day,
+                valid_to_datetime.month,
+                valid_to_datetime.year);
         if(is_last_refill_datetime_valid)
             furi_string_cat_printf(
-                parsed_data, "\nLast refill: %s", furi_string_get_cstr(last_refill_datetime_str));
-
-        furi_string_free(expiry_datetime_str);
-        furi_string_free(valid_to_datetime_str);
-        furi_string_free(last_refill_datetime_str);
+                parsed_data,
+                "\nПоследнее пополнение: %02u.%02u.%u",
+                last_refill_datetime.day,
+                last_refill_datetime.month,
+                last_refill_datetime.year);
 
         parsed = true;
     } while(false);

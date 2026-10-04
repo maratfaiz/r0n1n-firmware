@@ -40,25 +40,25 @@ StorageStatus storage_data_status(StorageData* storage) {
 }
 
 const char* storage_data_status_text(StorageData* storage) {
-    const char* result = "unknown";
+    const char* result = "неизвестно";
     switch(storage->status) {
     case StorageStatusOK:
-        result = "ok";
+        result = "ок";
         break;
     case StorageStatusNotReady:
-        result = "not ready";
+        result = "не готова";
         break;
     case StorageStatusNotMounted:
-        result = "not mounted";
+        result = "не подключена";
         break;
     case StorageStatusNoFS:
-        result = "no filesystem";
+        result = "нет ФС";
         break;
     case StorageStatusNotAccessible:
-        result = "not accessible";
+        result = "недоступна";
         break;
     case StorageStatusErrorInternal:
-        result = "internal";
+        result = "внутренняя";
         break;
     }
 

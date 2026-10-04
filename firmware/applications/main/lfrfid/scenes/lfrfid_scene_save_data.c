@@ -13,7 +13,7 @@ void lfrfid_scene_save_data_on_enter(void* context) {
         protocol_dict_get_data(app->dict, app->protocol_id, app->new_key_data, size);
     }
 
-    byte_input_set_header_text(byte_input, "Enter the data in hex");
+    byte_input_set_header_text(byte_input, "Введите данные (hex)");
 
     byte_input_set_result_callback(
         byte_input, lfrfid_text_input_callback, NULL, app, app->new_key_data, size);
@@ -35,9 +35,10 @@ bool lfrfid_scene_save_data_on_event(void* context, SceneManagerEvent event) {
             if(scene_manager_has_previous_scene(scene_manager, LfRfidSceneSaveType)) {
                 scene_manager_next_scene(scene_manager, LfRfidSceneSaveName);
             } else {
-                // No delete first: the name never changes here, so lfrfid_save_key() rewrites the
-                // very file this used to unlink, and unlinking it only widened the window in which
-                // a failure left the user with nothing.
+                if(!furi_string_empty(app->file_name)) {
+                    lfrfid_delete_key(app);
+                }
+
                 if(lfrfid_save_key(app)) {
                     scene_manager_next_scene(scene_manager, LfRfidSceneSaveSuccess);
                 } else {

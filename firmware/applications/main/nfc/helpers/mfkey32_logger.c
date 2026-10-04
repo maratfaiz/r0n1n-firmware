@@ -168,6 +168,6 @@ void mfkey32_logger_get_params_data(Mfkey32Logger* instance, FuriString* str) {
         if(!params->is_filled) continue;
 
         char key_char = params->key_type == MfClassicKeyTypeA ? 'A' : 'B';
-        furi_string_cat_printf(str, "Sector %d, key %c\n", params->sector_num, key_char);
+        furi_string_cat_printf(str, "Сектор %d, ключ %c\n", params->sector_num, key_char);
     }
 }

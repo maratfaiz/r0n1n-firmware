@@ -22,7 +22,6 @@
 #include <gui/modules/byte_input.h>
 #include <gui/modules/widget.h>
 #include <gui/modules/loading.h>
-#include <gui/modules/variable_item_list.h>
 
 #include <assets_icons.h>
 
@@ -33,8 +32,7 @@
 #define IBUTTON_APP_FILENAME_PREFIX    "iBtn"
 #define IBUTTON_APP_FILENAME_EXTENSION ".ibtn"
 
-#define IBUTTON_KEY_NAME_SIZE   23
-#define IBUTTON_TEXT_STORE_SIZE 128
+#define IBUTTON_KEY_NAME_SIZE 23
 
 typedef enum {
     iButtonWriteModeInvalid,
@@ -66,11 +64,6 @@ struct iButton {
     Popup* popup;
     Widget* widget;
     Loading* loading;
-    // Allocated on first use: variable_item_list_alloc() starts a periodic 333 ms timer it
-    // never stops, which would cap tickless idle for the whole session.
-    VariableItemList* variable_item_list;
-
-    char text_store[IBUTTON_TEXT_STORE_SIZE];
 };
 
 typedef enum {
@@ -80,7 +73,6 @@ typedef enum {
     iButtonViewPopup,
     iButtonViewWidget,
     iButtonViewLoading,
-    iButtonViewVariableItemList,
 } iButtonView;
 
 typedef enum {

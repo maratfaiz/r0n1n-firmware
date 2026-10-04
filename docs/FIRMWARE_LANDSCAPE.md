@@ -8,38 +8,27 @@ GitHub repositories (September 2026). Version numbers and release dates
 didn't match between the two sources and in places resembled hallucinated
 specifics — so only verified facts are listed here (repositories, active
 development status, general architectural differences), not invented build
-numbers. Before starting Stage 0 (fork), re-check the current `HEAD` of
-each repository — links below.
+numbers. Before syncing `firmware/` with a new upstream release, re-check
+the current state of each repository — links below.
 
-## Official Firmware (OFW)
+## Official Firmware (OFW) — R0N1N's base
 
 - Repository: `flipperdevices/flipperzero-firmware`.
 - FreeRTOS + Furi, layered architecture (HAL → services → applications).
-- Maximum stability, signed OTA updates, official App Catalog.
+- Maximum stability, signed OTA updates, official App Catalog — apps from
+  the catalog install on R0N1N without an API mismatch, because R0N1N
+  keeps the official API.
 - Regional TX restrictions on by default, doesn't store captured rolling
-  codes, minimal UI customization.
+  codes, minimal UI customization. R0N1N keeps these defaults: its value is
+  the UX layer, not unlocking the radio.
 - As of 2026, Flipper Devices has resumed active support for external
   contributions with stricter review (including specific attention to
-  AI-generated code touching low-level libraries) — worth factoring into
-  R0N1N's upstream-compatibility planning, though it doesn't block forking
-  from Unleashed.
+  AI-generated code touching low-level libraries) — relevant if R0N1N ever
+  upstreams fixes.
 
-## Unleashed (DarkFlippers) — recommended base for R0N1N
-
-- Repository: `DarkFlippers/unleashed-firmware`, actively maintained
-  (releases were still landing through September 2026).
-- "Official but unlocked": extended Sub-GHz range, regional restrictions
-  removed, additional protocols, saving and replaying captured signals,
-  external CC1101 support over SPI, security options (Lock on Boot, reset
-  on wrong PIN).
-- The most widely used stable base, and the foundation for both Momentum
-  and RogueMaster — i.e. maximum compatibility with community apps from
-  both directions.
-- Weak spot — UI stays close to stock, no deep interface rework.
-
-**Conclusion:** Unleashed remains the right choice for the fork base:
-stability + unlock + broad API compatibility, while its UI layer is barely
-reworked — meaning it won't fight the R0N1N UX layer.
+**Conclusion:** the official firmware is the fork base: the most stable
+code, the official app ecosystem, and a UI layer that is barely customized
+— meaning it won't fight the R0N1N UX layer.
 
 ## Momentum (Next-Flip) — source of UX ideas
 
@@ -52,16 +41,15 @@ reworked — meaning it won't fight the R0N1N UX layer.
   Packs, a keybind system (button remapping, press/hold), JS modules
   (Storage, GUI, BLE, SubGHz, USB Disk), Bad-KB (USB+BLE), FindMy, BLE
   Spam, GPS Subdriving.
-- **For R0N1N, Momentum is the main source of UX ideas and the best
-  technical reference for the interface**, but not the fork base: we port
-  and rethink specific components (Control Center, file manager, keybinds,
-  JS modules) on top of Unleashed rather than forking Momentum wholesale —
-  this keeps a narrow, predictable delta from upstream.
+- **For R0N1N, Momentum is a reference for UX ideas only** — not a fork
+  base and not a source of code: it's built on a different codebase than
+  the official firmware, so components like a Control Center, file manager
+  or keybinds are designed and written for R0N1N on top of the official
+  firmware instead.
 
 ## RogueMaster (RogueMaster/The-Flipper-Files) — catalog map, not a base
 
-- Repository: `RogueMaster/flipperzero-firmware-wPlugins`, based on
-  Unleashed.
+- Repository: `RogueMaster/flipperzero-firmware-wPlugins`.
 - "Kitchen sink": maximum apps, games, plugins, animations; releases ship
   frequently (weekly / with each OFW update).
 - Upside — breadth of community app coverage; downside — the least
@@ -81,25 +69,24 @@ reworked — meaning it won't fight the R0N1N UX layer.
 
 ## Synthesis: R0N1N's base strategy
 
-1. **Fork Unleashed** — the foundation (Stage 0): API/app compatibility,
-   the unlock, external-module support, active upstream maintenance. The
-   fork lives inside this same repository, under `firmware/`, brought in
-   via `git subtree` so Unleashed's commit history (and GPL attribution)
-   is preserved rather than squashed — this also keeps `git subtree pull`
-   available for staying in sync with upstream, instead of a separate
-   repository under a different remote.
-2. **Port the UX layer from Momentum**, reworked into R0N1N's own
-   information architecture (Home dashboard, pseudo-swipes, profiles — see
-   `UX_DESIGN.md`), not a blind copy of Momentum's menus.
-3. **RogueMaster and other community forks are a source of catalog
-   candidates** (`ECOSYSTEM.md`), not code to fork.
-4. **Disciplined, continuous rebasing onto Unleashed** — the main risk of
-   this strategy is drifting from upstream (see `ROADMAP.md`, risks
+1. **Fork the official firmware** — the foundation: stability, the official
+   App Catalog and API, active upstream maintenance. The fork lives inside
+   this same repository, under `firmware/`, brought in via `git subtree`
+   (tag `1.4.3`) so the upstream commit history (and GPL attribution) is
+   preserved rather than squashed — this also keeps `git subtree pull`
+   available for staying in sync with new official releases.
+2. **Write R0N1N's own UX layer** on top — Home dashboard, pseudo-swipes,
+   profiles (see `UX_DESIGN.md`). Other firmwares are a source of ideas,
+   not code: nothing is copied from third-party custom firmwares.
+3. **Community forks are a source of catalog candidates** (`ECOSYSTEM.md`),
+   installed as regular apps where they're compatible with the official
+   API, not code to fork.
+4. **Disciplined, regular syncing with official releases** — the main risk
+   of this strategy is drifting from upstream (see `ROADMAP.md`, risks
    section).
 
-## Sources to re-verify before Stage 0
+## Sources to re-verify before syncing upstream
 
-- `https://github.com/DarkFlippers/unleashed-firmware`
 - `https://github.com/Next-Flip/Momentum-Firmware`
 - `https://github.com/RogueMaster/flipperzero-firmware-wPlugins`
 - `https://github.com/flipperdevices/flipperzero-firmware`

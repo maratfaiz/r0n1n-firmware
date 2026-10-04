@@ -295,16 +295,16 @@ static void protocol_gallagher_render_data_internal(
         furi_string_printf(
             result,
             "FC: %lu\n"
-            "Card: %lu",
+            "Карта: %lu",
             fc,
             card_id);
     } else {
         furi_string_printf(
             result,
             "FC: %lu\n"
-            "Card: %lu\n"
-            "Region: %u\n"
-            "Issue Level: %u",
+            "Карта: %lu\n"
+            "Регион: %u\n"
+            "Уровень выпуска: %u",
             fc,
             card_id,
             region,

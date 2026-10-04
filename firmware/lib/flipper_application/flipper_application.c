@@ -14,8 +14,6 @@ struct FlipperApplication {
     ELFFile* elf;
     FuriThread* thread;
     void* ep_thread_args;
-    FlipperApplicationAssetsProgress assets_progress;
-    void* assets_progress_context;
 };
 
 /********************** Debugger access to loader state **********************/
@@ -61,8 +59,6 @@ FlipperApplication*
     app->elf = elf_file_alloc(storage, api_interface);
     app->thread = NULL;
     app->ep_thread_args = NULL;
-    app->assets_progress = NULL;
-    app->assets_progress_context = NULL;
 
     return app;
 }
@@ -145,8 +141,6 @@ static bool flipper_application_process_manifest_section(
 // we can't use const char* as context because we will lose the const qualifier
 typedef struct {
     const char* path;
-    FlipperApplicationAssetsProgress progress;
-    void* progress_context;
 } FlipperApplicationPreloadAssetsContext;
 
 static bool flipper_application_process_assets_section(
@@ -155,13 +149,7 @@ static bool flipper_application_process_assets_section(
     size_t size,
     void* context) {
     FlipperApplicationPreloadAssetsContext* preload_context = context;
-    return flipper_application_assets_load(
-        file,
-        preload_context->path,
-        offset,
-        size,
-        preload_context->progress,
-        preload_context->progress_context);
+    return flipper_application_assets_load(file, preload_context->path, offset, size);
 }
 
 static FlipperApplicationPreloadStatus
@@ -181,11 +169,7 @@ static FlipperApplicationPreloadStatus
         }
 
         // load assets section
-        FlipperApplicationPreloadAssetsContext preload_context = {
-            .path = path,
-            .progress = app->assets_progress,
-            .progress_context = app->assets_progress_context,
-        };
+        FlipperApplicationPreloadAssetsContext preload_context = {.path = path};
         if(elf_process_section(
                app->elf,
                ".fapassets",
@@ -203,15 +187,6 @@ static FlipperApplicationPreloadStatus
     }
 
     return flipper_application_validate_manifest(app);
-}
-
-void flipper_application_set_assets_progress_callback(
-    FlipperApplication* app,
-    FlipperApplicationAssetsProgress callback,
-    void* context) {
-    furi_check(app);
-    app->assets_progress = callback;
-    app->assets_progress_context = context;
 }
 
 /* Parse headers, load manifest */

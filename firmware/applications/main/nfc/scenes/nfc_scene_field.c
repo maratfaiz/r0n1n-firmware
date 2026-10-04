@@ -8,7 +8,7 @@ void nfc_scene_field_on_enter(void* context) {
     Popup* popup = nfc->popup;
     popup_set_header(
         popup,
-        "Field is on\nDon't leave device\nin this mode for too long.",
+        "Поле включено\nНе оставляйте надолго\nв этом режиме.",
         64,
         11,
         AlignCenter,

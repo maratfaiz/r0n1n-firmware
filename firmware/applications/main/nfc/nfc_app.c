@@ -1,9 +1,7 @@
 #include "nfc_app_i.h"
-#include "api/nfc_app_api_interface.h"
 #include "helpers/protocol_support/nfc_protocol_support.h"
 
 #include <dolphin/dolphin.h>
-#include <loader/firmware_api/firmware_api.h>
 
 bool nfc_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -51,16 +49,12 @@ NfcApp* nfc_app_alloc(void) {
 
     instance->nfc = nfc_alloc();
 
-    instance->api_resolver = composite_api_resolver_alloc();
-    composite_api_resolver_add(instance->api_resolver, firmware_api_interface);
-    composite_api_resolver_add(instance->api_resolver, nfc_application_api_interface);
-
     instance->detected_protocols = nfc_detected_protocols_alloc();
     instance->felica_auth = felica_auth_alloc();
     instance->mf_ul_auth = mf_ultralight_auth_alloc();
     instance->slix_unlock = slix_unlock_alloc();
     instance->mfc_key_cache = mf_classic_key_cache_alloc();
-    instance->nfc_supported_cards = nfc_supported_cards_alloc(instance->api_resolver);
+    instance->nfc_supported_cards = nfc_supported_cards_alloc();
 
     // Nfc device
     instance->nfc_device = nfc_device_alloc();
@@ -97,11 +91,6 @@ NfcApp* nfc_app_alloc(void) {
     instance->loading = loading_alloc();
     view_dispatcher_add_view(
         instance->view_dispatcher, NfcViewLoading, loading_get_view(instance->loading));
-
-    // Loading with label: own instance so its label and bar never show on the plain spinner
-    instance->loading_label = loading_alloc();
-    view_dispatcher_add_view(
-        instance->view_dispatcher, NfcViewLoadingLabel, loading_get_view(instance->loading_label));
 
     // Text Input
     instance->text_input = text_input_alloc();
@@ -159,10 +148,6 @@ void nfc_app_free(NfcApp* instance) {
     slix_unlock_free(instance->slix_unlock);
     mf_classic_key_cache_free(instance->mfc_key_cache);
     nfc_supported_cards_free(instance->nfc_supported_cards);
-    composite_api_resolver_free(instance->api_resolver);
-    if(instance->protocol_support) {
-        nfc_protocol_support_free(instance);
-    }
 
     // Nfc device
     nfc_device_free(instance->nfc_device);
@@ -182,10 +167,6 @@ void nfc_app_free(NfcApp* instance) {
     // Loading
     view_dispatcher_remove_view(instance->view_dispatcher, NfcViewLoading);
     loading_free(instance->loading);
-
-    // Loading with label
-    view_dispatcher_remove_view(instance->view_dispatcher, NfcViewLoadingLabel);
-    loading_free(instance->loading_label);
 
     // TextInput
     view_dispatcher_remove_view(instance->view_dispatcher, NfcViewTextInput);
@@ -263,11 +244,11 @@ void nfc_blink_stop(NfcApp* nfc) {
     notification_message(nfc->notifications, &sequence_blink_stop);
 }
 
-static void nfc_make_app_folders(NfcApp* instance) {
+void nfc_make_app_folders(NfcApp* instance) {
     furi_assert(instance);
 
     if(!storage_simply_mkdir(instance->storage, NFC_APP_FOLDER)) {
-        dialog_message_show_storage_error(instance->dialogs, "Cannot create\napp folder");
+        dialog_message_show_storage_error(instance->dialogs, "Не удалось создать\nпапку");
     }
 }
 
@@ -275,10 +256,10 @@ bool nfc_save_file(NfcApp* instance, FuriString* path) {
     furi_assert(instance);
     furi_assert(path);
 
-    bool result = nfc_device_save(instance->nfc_device, furi_string_get_cstr(path));
+    bool result = nfc_device_save(instance->nfc_device, furi_string_get_cstr(instance->file_path));
 
     if(!result) {
-        dialog_message_show_storage_error(instance->dialogs, "Cannot save\nkey file");
+        dialog_message_show_storage_error(instance->dialogs, "Не удалось сохранить\nфайл ключей");
     }
 
     return result;
@@ -365,7 +346,7 @@ bool nfc_load_file(NfcApp* instance, FuriString* path, bool show_dialog) {
     furi_assert(path);
     bool result = false;
 
-    //nfc_supported_cards_load_cache(instance->nfc_supported_cards);
+    nfc_supported_cards_load_cache(instance->nfc_supported_cards);
 
     FuriString* load_path = furi_string_alloc();
     if(nfc_has_shadow_file_internal(instance, path)) { //-V1051
@@ -385,7 +366,7 @@ bool nfc_load_file(NfcApp* instance, FuriString* path, bool show_dialog) {
     }
 
     if((!result) && (show_dialog)) {
-        dialog_message_show_storage_error(instance->dialogs, "Cannot load\nkey file");
+        dialog_message_show_storage_error(instance->dialogs, "Не удалось загрузить\nфайл ключей");
     }
 
     furi_string_free(load_path);
@@ -393,36 +374,19 @@ bool nfc_load_file(NfcApp* instance, FuriString* path, bool show_dialog) {
     return result;
 }
 
-bool nfc_delete_file(NfcApp* instance, const FuriString* path) {
-    furi_assert(instance);
-    furi_assert(path);
-
-    // A .shd only ever overlays its .nfc, so either spelling means "remove the card": normalise to
-    // the .nfc and drop the shadow beside it.
-    FuriString* target = furi_string_alloc_set(path);
-    if(furi_string_end_with_str(target, NFC_APP_SHADOW_EXTENSION)) {
-        furi_string_replace_at(target, furi_string_size(target) - 4, 4, NFC_APP_EXTENSION);
-    }
-
-    FuriString* shadow_path = furi_string_alloc();
-    bool result = storage_simply_remove(instance->storage, furi_string_get_cstr(target));
-    if(nfc_set_shadow_file_path(target, shadow_path)) {
-        // A surviving shadow would hijack the next card saved under this name, so it counts
-        // towards the result. storage_simply_remove() is happy when the file is already gone.
-        result = storage_simply_remove(instance->storage, furi_string_get_cstr(shadow_path)) &&
-                 result;
-    }
-
-    furi_string_free(shadow_path);
-    furi_string_free(target);
-
-    return result;
-}
-
 bool nfc_delete(NfcApp* instance) {
     furi_assert(instance);
 
-    return nfc_delete_file(instance, instance->file_path);
+    if(nfc_has_shadow_file(instance)) {
+        nfc_delete_shadow_file(instance);
+    }
+
+    if(furi_string_end_with_str(instance->file_path, NFC_APP_SHADOW_EXTENSION)) {
+        size_t path_len = furi_string_size(instance->file_path);
+        furi_string_replace_at(instance->file_path, path_len - 4, 4, NFC_APP_EXTENSION);
+    }
+
+    return storage_simply_remove(instance->storage, furi_string_get_cstr(instance->file_path));
 }
 
 bool nfc_delete_shadow_file(NfcApp* instance) {
@@ -451,46 +415,23 @@ bool nfc_load_from_file_select(NfcApp* instance) {
         if(!dialog_file_browser_show(
                instance->dialogs, instance->file_path, instance->file_path, &browser_options))
             break;
-
-        nfc_show_loading_popup(instance, true);
-        nfc_supported_cards_load_cache(instance->nfc_supported_cards);
-        nfc_show_loading_popup(instance, false);
-
         success = nfc_load_file(instance, instance->file_path, true);
     } while(!success);
 
     return success;
 }
 
-// Show a loading view (raising timer priority so its animation plays) or restore priority on hide.
-static void nfc_show_loading_view(NfcApp* nfc, NfcView view, bool show) {
+void nfc_show_loading_popup(void* context, bool show) {
+    NfcApp* nfc = context;
+
     if(show) {
         // Raise timer priority so that animations can play
         furi_timer_set_thread_priority(FuriTimerThreadPriorityElevated);
-        view_dispatcher_switch_to_view(nfc->view_dispatcher, view);
+        view_dispatcher_switch_to_view(nfc->view_dispatcher, NfcViewLoading);
     } else {
         // Restore default timer priority
         furi_timer_set_thread_priority(FuriTimerThreadPriorityNormal);
     }
-}
-
-void nfc_show_loading_popup(void* context, bool show) {
-    NfcApp* nfc = context;
-    nfc_show_loading_view(nfc, NfcViewLoading, show);
-}
-
-void nfc_show_loading_label_popup(void* context, const char* text, bool show) {
-    NfcApp* nfc = context;
-    if(show) {
-        loading_reset_progress(nfc->loading_label);
-        loading_set_text(nfc->loading_label, text);
-    }
-    nfc_show_loading_view(nfc, NfcViewLoadingLabel, show);
-}
-
-void nfc_set_loading_label_progress(void* context, float progress) {
-    NfcApp* nfc = context;
-    loading_set_progress(nfc->loading_label, progress);
 }
 
 void nfc_append_filename_string_when_present(NfcApp* instance, FuriString* string) {
@@ -498,7 +439,7 @@ void nfc_append_filename_string_when_present(NfcApp* instance, FuriString* strin
     furi_assert(string);
 
     if(!furi_string_empty(instance->file_name)) {
-        furi_string_cat_printf(string, "Name: %s\n", furi_string_get_cstr(instance->file_name));
+        furi_string_cat_printf(string, "Имя: %s\n", furi_string_get_cstr(instance->file_name));
     }
 }
 
@@ -507,10 +448,15 @@ static bool nfc_is_hal_ready(void) {
         // No connection to the chip, show an error screen
         DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
         DialogMessage* message = dialog_message_alloc();
-        dialog_message_set_header(message, "Error: NFC Chip Failed", 64, 0, AlignCenter, AlignTop);
+        dialog_message_set_header(message, "Ошибка: сбой чипа NFC", 64, 0, AlignCenter, AlignTop);
         dialog_message_set_text(
-            message, "Send error photo via\nsupport.flipper.net", 0, 63, AlignLeft, AlignBottom);
-        //dialog_message_set_icon(message, &I_err_09, 128 - 25, 64 - 25);
+            message,
+            "Отправьте фото ошибки\nна support.flipper.net",
+            0,
+            63,
+            AlignLeft,
+            AlignBottom);
+        dialog_message_set_icon(message, &I_err_09, 128 - 25, 64 - 25);
         dialog_message_show(dialogs, message);
         dialog_message_free(message);
         furi_record_close(RECORD_DIALOGS);
@@ -523,19 +469,9 @@ static bool nfc_is_hal_ready(void) {
 static void nfc_show_initial_scene_for_device(NfcApp* nfc) {
     NfcProtocol prot = nfc_device_get_protocol(nfc->nfc_device);
     uint32_t scene = nfc_protocol_support_has_feature(
-                         prot, nfc, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
+                         prot, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
                          NfcSceneEmulate :
                          NfcSceneSavedMenu;
-    // Load plugins (parsers) in case if we are in the saved menu
-    if(scene == NfcSceneSavedMenu) {
-        nfc_show_loading_popup(nfc, true);
-        nfc_supported_cards_load_cache(nfc->nfc_supported_cards);
-        nfc_show_loading_popup(nfc, false);
-    } else {
-        // Launching straight into emulation skips the saved menu, and with it the only
-        // place this deed was recorded
-        dolphin_deed(DolphinDeedNfcEmulate);
-    }
     scene_manager_next_scene(nfc->scene_manager, scene);
 }
 

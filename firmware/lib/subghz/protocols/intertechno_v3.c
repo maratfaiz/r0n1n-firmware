@@ -5,7 +5,6 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
 
 #define TAG "SubGhzProtocolIntertechnoV3"
 
@@ -28,7 +27,6 @@ struct SubGhzProtocolDecoderIntertechno_V3 {
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderIntertechno_V3);
 
 struct SubGhzProtocolEncoderIntertechno_V3 {
     SubGhzProtocolEncoderBase base;
@@ -36,7 +34,6 @@ struct SubGhzProtocolEncoderIntertechno_V3 {
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderIntertechno_V3);
 
 typedef enum {
     IntertechnoV3DecoderStepReset = 0,
@@ -50,24 +47,24 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_intertechno_v3_decoder = {
     .alloc = subghz_protocol_decoder_intertechno_v3_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_intertechno_v3_free,
 
     .feed = subghz_protocol_decoder_intertechno_v3_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_intertechno_v3_reset,
 
-    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
-    .serialize = subghz_protocol_decoder_common_serialize,
+    .get_hash_data = subghz_protocol_decoder_intertechno_v3_get_hash_data,
+    .serialize = subghz_protocol_decoder_intertechno_v3_serialize,
     .deserialize = subghz_protocol_decoder_intertechno_v3_deserialize,
     .get_string = subghz_protocol_decoder_intertechno_v3_get_string,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_intertechno_v3_encoder = {
     .alloc = subghz_protocol_encoder_intertechno_v3_alloc,
-    .free = subghz_protocol_encoder_common_free,
+    .free = subghz_protocol_encoder_intertechno_v3_free,
 
     .deserialize = subghz_protocol_encoder_intertechno_v3_deserialize,
     .stop = subghz_protocol_encoder_intertechno_v3_stop,
-    .yield = subghz_protocol_encoder_common_yield,
+    .yield = subghz_protocol_encoder_intertechno_v3_yield,
 };
 
 const SubGhzProtocol subghz_protocol_intertechno_v3 = {
@@ -83,14 +80,30 @@ const SubGhzProtocol subghz_protocol_intertechno_v3 = {
 
 void* subghz_protocol_encoder_intertechno_v3_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderIntertechno_V3), &subghz_protocol_intertechno_v3, 3, 256);
+    SubGhzProtocolEncoderIntertechno_V3* instance =
+        malloc(sizeof(SubGhzProtocolEncoderIntertechno_V3));
+
+    instance->base.protocol = &subghz_protocol_intertechno_v3;
+    instance->generic.protocol_name = instance->base.protocol->name;
+
+    instance->encoder.repeat = 10;
+    instance->encoder.size_upload = 256;
+    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
+    instance->encoder.is_running = false;
+    return instance;
+}
+
+void subghz_protocol_encoder_intertechno_v3_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolEncoderIntertechno_V3* instance = context;
+    free(instance->encoder.upload);
+    free(instance);
 }
 
 /**
  * Generating an upload from data.
  * @param instance Pointer to a SubGhzProtocolEncoderIntertechno_V3 instance
- * @return true Always; this encoder has no failure path
+ * @return true On success
  */
 static bool subghz_protocol_encoder_intertechno_v3_get_upload(
     SubGhzProtocolEncoderIntertechno_V3* instance) {
@@ -163,7 +176,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_intertechno_v3_deserialize(
             ret = SubGhzProtocolStatusErrorValueBitCount;
             break;
         }
-        // Optional value
+        //optional parameter parameter
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
@@ -183,10 +196,43 @@ void subghz_protocol_encoder_intertechno_v3_stop(void* context) {
     instance->encoder.front = 0; // reset position
 }
 
+LevelDuration subghz_protocol_encoder_intertechno_v3_yield(void* context) {
+    SubGhzProtocolEncoderIntertechno_V3* instance = context;
+
+    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
+        instance->encoder.is_running = false;
+        return level_duration_reset();
+    }
+
+    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
+
+    if(++instance->encoder.front == instance->encoder.size_upload) {
+        instance->encoder.repeat--;
+        instance->encoder.front = 0;
+    }
+
+    return ret;
+}
+
 void* subghz_protocol_decoder_intertechno_v3_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderIntertechno_V3), &subghz_protocol_intertechno_v3);
+    SubGhzProtocolDecoderIntertechno_V3* instance =
+        malloc(sizeof(SubGhzProtocolDecoderIntertechno_V3));
+    instance->base.protocol = &subghz_protocol_intertechno_v3;
+    instance->generic.protocol_name = instance->base.protocol->name;
+    return instance;
+}
+
+void subghz_protocol_decoder_intertechno_v3_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIntertechno_V3* instance = context;
+    free(instance);
+}
+
+void subghz_protocol_decoder_intertechno_v3_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIntertechno_V3* instance = context;
+    instance->decoder.parser_step = IntertechnoV3DecoderStepReset;
 }
 
 void subghz_protocol_decoder_intertechno_v3_feed(void* context, bool level, uint32_t duration) {
@@ -354,6 +400,22 @@ static void subghz_protocol_intertechno_v3_check_remote_controller(SubGhzBlockGe
     }
 }
 
+uint8_t subghz_protocol_decoder_intertechno_v3_get_hash_data(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIntertechno_V3* instance = context;
+    return subghz_protocol_blocks_get_hash_data(
+        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
+}
+
+SubGhzProtocolStatus subghz_protocol_decoder_intertechno_v3_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset) {
+    furi_assert(context);
+    SubGhzProtocolDecoderIntertechno_V3* instance = context;
+    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+}
+
 SubGhzProtocolStatus subghz_protocol_decoder_intertechno_v3_deserialize(
     void* context,
     FlipperFormat* flipper_format) {
@@ -382,10 +444,6 @@ void subghz_protocol_decoder_intertechno_v3_get_string(void* context, FuriString
 
     subghz_protocol_intertechno_v3_check_remote_controller(&instance->generic);
 
-    // push protocol data to global variable
-    subghz_block_generic_global.current_btn = instance->generic.btn;
-    //
-
     furi_string_cat_printf(
         output,
         "%.11s %db\r\n"
@@ -401,16 +459,12 @@ void subghz_protocol_decoder_intertechno_v3_get_string(void* context, FuriString
         if(instance->generic.cnt >> 5) {
             furi_string_cat_printf(
                 output, "Ch: All Btn:%s\r\n", (instance->generic.btn ? "On" : "Off"));
-            subghz_block_generic_global.btn_is_available = false;
-            subghz_block_generic_global.btn_length_bit = 1;
         } else {
             furi_string_cat_printf(
                 output,
                 "Ch:" CH_PATTERN " Btn:%s\r\n",
                 CNT_TO_CH(instance->generic.cnt),
                 (instance->generic.btn ? "On" : "Off"));
-            subghz_block_generic_global.btn_is_available = false;
-            subghz_block_generic_global.btn_length_bit = 1;
         }
     } else if(instance->generic.data_count_bit == INTERTECHNO_V3_DIMMING_COUNT_BIT) {
         furi_string_cat_printf(
@@ -418,7 +472,5 @@ void subghz_protocol_decoder_intertechno_v3_get_string(void* context, FuriString
             "Ch:" CH_PATTERN " Dimm:%d%%\r\n",
             CNT_TO_CH(instance->generic.cnt),
             (int)(6.67f * (float)instance->generic.btn));
-        subghz_block_generic_global.btn_is_available = false;
-        subghz_block_generic_global.btn_length_bit = 4;
     }
 }

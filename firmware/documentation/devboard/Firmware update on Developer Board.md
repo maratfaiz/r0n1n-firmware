@@ -5,7 +5,7 @@ It's important to regularly update your Developer Board to ensure that you have 
 > [!note]
 > This guide assumes that you're familiar with the basics of the command line. If you're new to it, we recommend checking out these [Windows](https://learn.microsoft.com/en-us/powershell/scripting/learn/ps101/01-getting-started?view=powershell-7.4) or [macOS/Linux](https://ubuntu.com/tutorials/command-line-for-beginners#1-overview) command line tutorials.
 
-If you’re not, please refer to the [Windows](https://www.digitalcitizen.life/command-prompt-how-use-basic-commands/) or [MacOS / Linux](https://ubuntu.com/tutorials/command-line-for-beginners#1-overview) command line tutorials.
+***
 
 ## Step 1. Install the micro Flipper Build Tool
 

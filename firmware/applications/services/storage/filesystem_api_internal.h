@@ -172,6 +172,12 @@ typedef struct {
  *      @param path2 second path to be compared
  *      @param truncate if set to true, compare only up to the path1's length
  *      @return true if path1 and path2 are considered equivalent
+ *
+ *  @var FS_Common_Api::mtime
+ *      @brief Get a file's last modification time (R0N1N, storage_common_mtime())
+ *      @param path path to the file
+ *      @param timestamp pointer to the UNIX timestamp to fill
+ *      @return FS_Error error info
  */
 typedef struct {
     FS_Error (*const stat)(void* context, const char* path, FileInfo* fileinfo);
@@ -183,6 +189,7 @@ typedef struct {
         uint64_t* total_space,
         uint64_t* free_space);
     bool (*const equivalent_path)(const char* path1, const char* path2);
+    FS_Error (*const mtime)(void* context, const char* path, uint32_t* timestamp);
 } FS_Common_Api;
 
 /** Full filesystem api structure */

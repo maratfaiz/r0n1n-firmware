@@ -284,12 +284,9 @@ void protocol_fdx_b_render_data(ProtocolFDXB* protocol, FuriString* result) {
 
     bool block_status = bit_lib_get_bit(protocol->data, 48);
     bool rudi_bit = bit_lib_get_bit(protocol->data, 49);
-    uint8_t visual_start_digit =
-        bit_lib_reverse_8_fast(bit_lib_get_bits(protocol->data, 50, 3) << 5);
-    uint8_t reserved = bit_lib_reverse_8_fast(bit_lib_get_bits(protocol->data, 53, 2) << 6);
-    uint8_t user_info = bit_lib_reverse_8_fast(bit_lib_get_bits(protocol->data, 55, 5) << 3);
-    uint8_t replacement_number =
-        bit_lib_reverse_8_fast(bit_lib_get_bits(protocol->data, 60, 3) << 5);
+    uint8_t reserved = bit_lib_get_bits(protocol->data, 50, 5);
+    uint8_t user_info = bit_lib_get_bits(protocol->data, 55, 5);
+    uint8_t replacement_number = bit_lib_get_bits(protocol->data, 60, 3);
     bool animal_flag = bit_lib_get_bit(protocol->data, 63);
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FuriString* country_full_name = furi_string_alloc();
@@ -299,9 +296,9 @@ void protocol_fdx_b_render_data(ProtocolFDXB* protocol, FuriString* result) {
     furi_string_printf(
         result,
         "ID: %03hu-%012llu\n"
-        "Country Code: %hu\n"
-        "Country: %s\n"
-        "Temperature: ",
+        "Код страны: %hu\n"
+        "Страна: %s\n"
+        "Температура: ",
         country_code,
         national_code,
         country_code,
@@ -322,20 +319,14 @@ void protocol_fdx_b_render_data(ProtocolFDXB* protocol, FuriString* result) {
     furi_string_cat_printf(
         result,
         "\n"
-        "Animal: %s\n"
-        "Visual Start Digit: %hu\n"
-        "Replacement Number: %hu\n"
-        "User Info: %hhX\n"
-        "Data Block: %s\n"
-        "RUDI Bit: %s\n"
-        "RFU: %hhX\n",
+        "Животное: %s\n"
+        "Биты: %hhX-%hhX-%hhX-%hhX-%hhX",
         animal_flag ? "Yes" : "No",
-        visual_start_digit,
-        replacement_number,
+        block_status,
+        rudi_bit,
+        reserved,
         user_info,
-        block_status ? "Present" : "Absent",
-        rudi_bit ? "Yes" : "No",
-        reserved);
+        replacement_number);
 
     furi_string_free(country_full_name);
 }
@@ -353,7 +344,7 @@ void protocol_fdx_b_render_brief_data(ProtocolFDXB* protocol, FuriString* result
     furi_string_printf(
         result,
         "ID: %03hu-%012llu\n"
-        "Country: %hu %s; Temp.: ",
+        "Страна: %hu %s; Темп.: ",
         country_code,
         national_code,
         country_code,
@@ -392,21 +383,6 @@ bool protocol_fdx_b_write_data(ProtocolFDXB* protocol, void* data) {
         request->t5577.block[3] = bit_lib_get_bits_32(protocol->encoded_data, 64, 32);
         request->t5577.block[4] = bit_lib_get_bits_32(protocol->encoded_data, 96, 32);
         request->t5577.blocks_to_write = 5;
-        result = true;
-    } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-        request->em4305.word[4] =
-            (EM4x05_MODULATION_BIPHASE | EM4x05_SET_BITRATE(32) | (8 << EM4x05_MAXBLOCK_SHIFT));
-        uint32_t encoded_data_reversed[4] = {0};
-        for(uint8_t i = 0; i < 128; i++) {
-            encoded_data_reversed[i / 32] =
-                (encoded_data_reversed[i / 32] << 1) |
-                (bit_lib_get_bit(protocol->encoded_data, (127 - i)) & 1);
-        }
-        request->em4305.word[5] = encoded_data_reversed[3];
-        request->em4305.word[6] = encoded_data_reversed[2];
-        request->em4305.word[7] = encoded_data_reversed[1];
-        request->em4305.word[8] = encoded_data_reversed[0];
-        request->em4305.mask = 0x1F0;
         result = true;
     }
     return result;

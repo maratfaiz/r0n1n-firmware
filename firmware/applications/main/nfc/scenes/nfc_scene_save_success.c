@@ -11,7 +11,7 @@ void nfc_scene_save_success_on_enter(void* context) {
     // Setup view
     Popup* popup = nfc->popup;
     popup_set_icon(popup, 36, 5, &I_DolphinSaved_92x58);
-    popup_set_header(popup, "Saved", 15, 19, AlignLeft, AlignBottom);
+    popup_set_header(popup, "Сохранено", 15, 19, AlignLeft, AlignBottom);
     popup_set_timeout(popup, 1500);
     popup_set_context(popup, nfc);
     popup_set_callback(popup, nfc_scene_save_success_popup_callback);
@@ -25,9 +25,13 @@ bool nfc_scene_save_success_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == NfcCustomEventViewExit) {
-            if(scene_manager_has_previous_scene(nfc->scene_manager, NfcSceneKeyDict)) {
+            if(scene_manager_has_previous_scene(nfc->scene_manager, NfcSceneMfClassicKeys)) {
                 consumed = scene_manager_search_and_switch_to_previous_scene(
-                    nfc->scene_manager, NfcSceneKeyDict);
+                    nfc->scene_manager, NfcSceneMfClassicKeys);
+            } else if(scene_manager_has_previous_scene(
+                          nfc->scene_manager, NfcSceneMfUltralightCKeys)) {
+                consumed = scene_manager_search_and_switch_to_previous_scene(
+                    nfc->scene_manager, NfcSceneMfUltralightCKeys);
             } else if(scene_manager_has_previous_scene(nfc->scene_manager, NfcSceneSaveConfirm)) {
                 NfcSceneSaveConfirmState scene_state =
                     scene_manager_get_scene_state(nfc->scene_manager, NfcSceneSaveConfirm);

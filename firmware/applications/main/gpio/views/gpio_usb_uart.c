@@ -23,55 +23,55 @@ typedef struct {
 
 static void gpio_usb_uart_draw_callback(Canvas* canvas, void* _model) {
     GpioUsbUartModel* model = _model;
-    char temp_str[18];
-    elements_button_left(canvas, "Config");
+    char temp_str[32];
+    elements_button_left(canvas, "Настр.");
     canvas_draw_line(canvas, 2, 10, 125, 10);
     canvas_draw_line(canvas, 44, 52, 123, 52);
 
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 9, "USB Serial");
+    canvas_draw_str(canvas, 2, 9, "USB-порт");
     canvas_draw_str(canvas, 3, 25, "TX:");
     canvas_draw_str(canvas, 3, 42, "RX:");
 
     canvas_set_font(canvas, FontSecondary);
-    snprintf(temp_str, 18, "COM PORT:%u", model->vcp_port);
+    snprintf(temp_str, sizeof(temp_str), "COM-ПОРТ:%u", model->vcp_port);
     canvas_draw_str_aligned(canvas, 126, 8, AlignRight, AlignBottom, temp_str);
-    snprintf(temp_str, 18, "Pin %u", model->tx_pin);
+    snprintf(temp_str, sizeof(temp_str), "Пин %u", model->tx_pin);
     canvas_draw_str(canvas, 22, 25, temp_str);
-    snprintf(temp_str, 18, "Pin %u", model->rx_pin);
+    snprintf(temp_str, sizeof(temp_str), "Пин %u", model->rx_pin);
     canvas_draw_str(canvas, 22, 42, temp_str);
 
     if(model->baudrate == 0)
-        snprintf(temp_str, 18, "Baud: ????");
+        snprintf(temp_str, sizeof(temp_str), "Скорость: ????");
     else
-        snprintf(temp_str, 18, "Baud: %lu", model->baudrate);
+        snprintf(temp_str, sizeof(temp_str), "Скорость: %lu", model->baudrate);
     canvas_draw_str(canvas, 45, 62, temp_str);
 
     if(model->tx_cnt < 100000000) {
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 127, 24, AlignRight, AlignBottom, "B.");
+        canvas_draw_str_aligned(canvas, 127, 24, AlignRight, AlignBottom, "Б.");
         canvas_set_font(canvas, FontKeyboard);
-        snprintf(temp_str, 18, "%lu", model->tx_cnt);
+        snprintf(temp_str, sizeof(temp_str), "%lu", model->tx_cnt);
         canvas_draw_str_aligned(canvas, 116, 24, AlignRight, AlignBottom, temp_str);
     } else {
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 127, 24, AlignRight, AlignBottom, "KiB.");
+        canvas_draw_str_aligned(canvas, 127, 24, AlignRight, AlignBottom, "КиБ.");
         canvas_set_font(canvas, FontKeyboard);
-        snprintf(temp_str, 18, "%lu", model->tx_cnt / 1024);
+        snprintf(temp_str, sizeof(temp_str), "%lu", model->tx_cnt / 1024);
         canvas_draw_str_aligned(canvas, 111, 24, AlignRight, AlignBottom, temp_str);
     }
 
     if(model->rx_cnt < 100000000) {
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, "B.");
+        canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, "Б.");
         canvas_set_font(canvas, FontKeyboard);
-        snprintf(temp_str, 18, "%lu", model->rx_cnt);
+        snprintf(temp_str, sizeof(temp_str), "%lu", model->rx_cnt);
         canvas_draw_str_aligned(canvas, 116, 41, AlignRight, AlignBottom, temp_str);
     } else {
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, "KiB.");
+        canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, "КиБ.");
         canvas_set_font(canvas, FontKeyboard);
-        snprintf(temp_str, 18, "%lu", model->rx_cnt / 1024);
+        snprintf(temp_str, sizeof(temp_str), "%lu", model->rx_cnt / 1024);
         canvas_draw_str_aligned(canvas, 111, 41, AlignRight, AlignBottom, temp_str);
     }
 

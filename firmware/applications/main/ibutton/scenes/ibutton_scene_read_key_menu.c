@@ -22,10 +22,14 @@ void ibutton_scene_read_key_menu_on_enter(void* context) {
     const uint32_t features = ibutton_protocols_get_features(ibutton->protocols, protocol_id);
 
     submenu_add_item(
-        submenu, "Save", SubmenuIndexSave, ibutton_scene_read_key_menu_submenu_callback, ibutton);
+        submenu,
+        "Сохранить",
+        SubmenuIndexSave,
+        ibutton_scene_read_key_menu_submenu_callback,
+        ibutton);
     submenu_add_item(
         submenu,
-        "Emulate",
+        "Эмуляция",
         SubmenuIndexEmulate,
         ibutton_scene_read_key_menu_submenu_callback,
         ibutton);
@@ -33,7 +37,7 @@ void ibutton_scene_read_key_menu_on_enter(void* context) {
     if(features & iButtonProtocolFeatureWriteId) {
         submenu_add_item(
             submenu,
-            "Write ID",
+            "Записать ID",
             SubmenuIndexWriteId,
             ibutton_scene_read_key_menu_submenu_callback,
             ibutton);
@@ -42,7 +46,7 @@ void ibutton_scene_read_key_menu_on_enter(void* context) {
     if(features & iButtonProtocolFeatureWriteCopy) {
         submenu_add_item(
             submenu,
-            "Full Write on Same Type",
+            "Полная запись (тот же тип)",
             SubmenuIndexWriteCopy,
             ibutton_scene_read_key_menu_submenu_callback,
             ibutton);
@@ -51,7 +55,7 @@ void ibutton_scene_read_key_menu_on_enter(void* context) {
     if(features & iButtonProtocolFeatureExtData) {
         submenu_add_item(
             submenu,
-            "Data Info",
+            "О данных",
             SubmenuIndexViewData,
             ibutton_scene_read_key_menu_submenu_callback,
             ibutton);

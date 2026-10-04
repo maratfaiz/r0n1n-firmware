@@ -4,13 +4,8 @@
 #include "views.h"
 #include <notification/notification_messages.h>
 #include <dolphin/dolphin.h>
-#include <flipper_format/flipper_format.h>
 
 #define TAG "HidApp"
-
-#define HID_BT_CFG_PATH      APP_DATA_PATH(".bt_hid.cfg")
-#define HID_BT_CFG_FILE_TYPE "Flipper BT Remote Settings File"
-#define HID_BT_CFG_VERSION   1
 
 bool hid_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -38,60 +33,6 @@ void bt_hid_remove_pairing(Hid* app) {
     furi_hal_bt_start_advertising();
 }
 
-static void bt_hid_load_cfg(Hid* app) {
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    FlipperFormat* fff = flipper_format_file_alloc(storage);
-    bool loaded = false;
-
-    FuriString* temp_str = furi_string_alloc();
-    uint32_t temp_uint = 0;
-
-    do {
-        if(!flipper_format_file_open_existing(fff, HID_BT_CFG_PATH)) break;
-
-        if(!flipper_format_read_header(fff, temp_str, &temp_uint)) break;
-        if((strcmp(furi_string_get_cstr(temp_str), HID_BT_CFG_FILE_TYPE) != 0) ||
-           (temp_uint != HID_BT_CFG_VERSION))
-            break;
-
-        if(flipper_format_read_string(fff, "name", temp_str)) {
-            strlcpy(
-                app->ble_hid_cfg.name,
-                furi_string_get_cstr(temp_str),
-                sizeof(app->ble_hid_cfg.name));
-        } else {
-            flipper_format_rewind(fff);
-        }
-
-        loaded = true;
-    } while(0);
-
-    furi_string_free(temp_str);
-
-    flipper_format_free(fff);
-    furi_record_close(RECORD_STORAGE);
-
-    if(!loaded) {
-        app->ble_hid_cfg.name[0] = '\0';
-    }
-}
-
-void bt_hid_save_cfg(Hid* app) {
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    FlipperFormat* fff = flipper_format_file_alloc(storage);
-
-    if(flipper_format_file_open_always(fff, HID_BT_CFG_PATH)) {
-        do {
-            if(!flipper_format_write_header_cstr(fff, HID_BT_CFG_FILE_TYPE, HID_BT_CFG_VERSION))
-                break;
-            if(!flipper_format_write_string_cstr(fff, "name", app->ble_hid_cfg.name)) break;
-        } while(0);
-    }
-
-    flipper_format_free(fff);
-    furi_record_close(RECORD_STORAGE);
-}
-
 static void bt_hid_connection_status_changed_callback(BtStatus status, void* context) {
     furi_assert(context);
     Hid* hid = context;
@@ -100,21 +41,11 @@ static void bt_hid_connection_status_changed_callback(BtStatus status, void* con
         hid->notifications, connected ? &sequence_set_blue_255 : &sequence_reset_blue);
     hid_keynote_set_connected_status(hid->hid_keynote, connected);
     hid_keyboard_set_connected_status(hid->hid_keyboard, connected);
-    hid_numpad_set_connected_status(hid->hid_numpad, connected);
     hid_media_set_connected_status(hid->hid_media, connected);
-    hid_music_macos_set_connected_status(hid->hid_music_macos, connected);
-    hid_movie_set_connected_status(hid->hid_movie, connected);
     hid_mouse_set_connected_status(hid->hid_mouse, connected);
     hid_mouse_clicker_set_connected_status(hid->hid_mouse_clicker, connected);
     hid_mouse_jiggler_set_connected_status(hid->hid_mouse_jiggler, connected);
-    hid_mouse_jiggler_stealth_set_connected_status(hid->hid_mouse_jiggler_stealth, connected);
-    hid_ptt_set_connected_status(hid->hid_ptt, connected);
     hid_tiktok_set_connected_status(hid->hid_tiktok, connected);
-}
-
-static uint32_t hid_ptt_menu_view(void* context) {
-    UNUSED(context);
-    return HidViewPushToTalkMenu;
 }
 
 Hid* hid_alloc() {
@@ -148,11 +79,6 @@ Hid* hid_alloc() {
     app->dialog = dialog_ex_alloc();
     view_dispatcher_add_view(app->view_dispatcher, HidViewDialog, dialog_ex_get_view(app->dialog));
 
-    // Text input
-    app->text_input = text_input_alloc();
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewTextInput, text_input_get_view(app->text_input));
-
     // Popup view
     app->popup = popup_alloc();
     view_dispatcher_add_view(app->view_dispatcher, HidViewPopup, popup_get_view(app->popup));
@@ -167,25 +93,10 @@ Hid* hid_alloc() {
     view_dispatcher_add_view(
         app->view_dispatcher, HidViewKeyboard, hid_keyboard_get_view(app->hid_keyboard));
 
-    //Numpad keyboard view
-    app->hid_numpad = hid_numpad_alloc(app);
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewNumpad, hid_numpad_get_view(app->hid_numpad));
-
     // Media view
     app->hid_media = hid_media_alloc(app);
     view_dispatcher_add_view(
         app->view_dispatcher, HidViewMedia, hid_media_get_view(app->hid_media));
-
-    // Music MacOs view
-    app->hid_music_macos = hid_music_macos_alloc(app);
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewMusicMacOs, hid_music_macos_get_view(app->hid_music_macos));
-
-    // Movie view
-    app->hid_movie = hid_movie_alloc(app);
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewMovie, hid_movie_get_view(app->hid_movie));
 
     // TikTok view
     app->hid_tiktok = hid_tiktok_alloc(app);
@@ -210,21 +121,6 @@ Hid* hid_alloc() {
         app->view_dispatcher,
         HidViewMouseJiggler,
         hid_mouse_jiggler_get_view(app->hid_mouse_jiggler));
-    // Mouse jiggler stealth view
-    app->hid_mouse_jiggler_stealth = hid_mouse_jiggler_stealth_alloc(app);
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        HidViewMouseJigglerStealth,
-        hid_mouse_jiggler_stealth_get_view(app->hid_mouse_jiggler_stealth));
-
-    // PushToTalk view
-    app->hid_ptt_menu = hid_ptt_menu_alloc(app);
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewPushToTalkMenu, hid_ptt_menu_get_view(app->hid_ptt_menu));
-    app->hid_ptt = hid_ptt_alloc(app);
-    view_set_previous_callback(hid_ptt_get_view(app->hid_ptt), hid_ptt_menu_view);
-    view_dispatcher_add_view(
-        app->view_dispatcher, HidViewPushToTalk, hid_ptt_get_view(app->hid_ptt));
 
     return app;
 }
@@ -241,34 +137,20 @@ void hid_free(Hid* app) {
     submenu_free(app->submenu);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewDialog);
     dialog_ex_free(app->dialog);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewTextInput);
-    text_input_free(app->text_input);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewPopup);
     popup_free(app->popup);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewKeynote);
     hid_keynote_free(app->hid_keynote);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewKeyboard);
     hid_keyboard_free(app->hid_keyboard);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewNumpad);
-    hid_numpad_free(app->hid_numpad);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewMedia);
     hid_media_free(app->hid_media);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewMusicMacOs);
-    hid_music_macos_free(app->hid_music_macos);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewMovie);
-    hid_movie_free(app->hid_movie);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewMouse);
     hid_mouse_free(app->hid_mouse);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewMouseClicker);
     hid_mouse_clicker_free(app->hid_mouse_clicker);
     view_dispatcher_remove_view(app->view_dispatcher, HidViewMouseJiggler);
     hid_mouse_jiggler_free(app->hid_mouse_jiggler);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewMouseJigglerStealth);
-    hid_mouse_jiggler_stealth_free(app->hid_mouse_jiggler_stealth);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewPushToTalkMenu);
-    hid_ptt_menu_free(app->hid_ptt_menu);
-    view_dispatcher_remove_view(app->view_dispatcher, HidViewPushToTalk);
-    hid_ptt_free(app->hid_ptt);
     view_dispatcher_remove_view(app->view_dispatcher, BtHidViewTikTok);
     hid_tiktok_free(app->hid_tiktok);
     scene_manager_free(app->scene_manager);
@@ -332,14 +214,12 @@ int32_t hid_ble_app(void* p) {
 
     furi_record_close(RECORD_STORAGE);
 
-    bt_hid_load_cfg(app);
-
-    app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid_ext, &app->ble_hid_cfg);
+    app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
 
     furi_check(app->ble_hid_profile);
 
-    bt_set_status_changed_callback(app->bt, bt_hid_connection_status_changed_callback, app);
     furi_hal_bt_start_advertising();
+    bt_set_status_changed_callback(app->bt, bt_hid_connection_status_changed_callback, app);
 
     dolphin_deed(DolphinDeedPluginStart);
 

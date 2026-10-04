@@ -21,8 +21,8 @@ static void draw_stat(Canvas* canvas, int x, int y, const Icon* icon, char* val)
 }
 
 static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
-    char emote[20] = {};
-    char header[20] = {};
+    char emote[32] = {};
+    char header[32] = {};
     char value[20] = {};
 
     int32_t current = 1000.0f * data->gauge_current;
@@ -44,8 +44,8 @@ static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
 
     // Set text
     if(current > 0) {
-        snprintf(emote, sizeof(emote), "%s", "Yummy!");
-        snprintf(header, sizeof(header), "%s", "Charging at");
+        snprintf(emote, sizeof(emote), "%s", "Ням!");
+        snprintf(header, sizeof(header), "%s", "Заряд током");
         snprintf(
             value,
             sizeof(value),
@@ -59,19 +59,19 @@ static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
             emote,
             sizeof(emote),
             "%s",
-            current < HIGH_DRAIN_CURRENT_THRESHOLD ? "Oh no!" : "Om-nom-nom!");
-        snprintf(header, sizeof(header), "%s", "Consumption is");
+            current < HIGH_DRAIN_CURRENT_THRESHOLD ? "Ой!" : "Ом-ном-ном!");
+        snprintf(header, sizeof(header), "%s", "Потребление");
         snprintf(
             value,
             sizeof(value),
             "%ld %s",
             ABS(current),
-            current < HIGH_DRAIN_CURRENT_THRESHOLD ? "mA!" : "mA");
+            current < HIGH_DRAIN_CURRENT_THRESHOLD ? "мА!" : "мА");
     } else if(data->vbus_voltage > 0) {
         if(data->charge_voltage_limit < 4.2f) {
             // Non-default battery charging limit, mention it
-            snprintf(emote, sizeof(emote), "Charged!");
-            snprintf(header, sizeof(header), "Limited to");
+            snprintf(emote, sizeof(emote), "Заряжено!");
+            snprintf(header, sizeof(header), "Ограничено");
             snprintf(
                 value,
                 sizeof(value),
@@ -79,10 +79,10 @@ static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
                 (uint32_t)(data->charge_voltage_limit),
                 (uint32_t)(data->charge_voltage_limit * 10) % 10);
         } else {
-            snprintf(header, sizeof(header), "Charged!");
+            snprintf(header, sizeof(header), "Заряжено!");
         }
     } else {
-        snprintf(header, sizeof(header), "Napping...");
+        snprintf(header, sizeof(header), "Дремлю...");
     }
 
     canvas_draw_str_aligned(canvas, 92, y + 3, AlignCenter, AlignCenter, emote);

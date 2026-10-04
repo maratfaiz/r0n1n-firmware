@@ -5,7 +5,6 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
 
 #define TAG "SubGhzProtocolNeroRadio"
 
@@ -24,7 +23,6 @@ struct SubGhzProtocolDecoderNeroRadio {
 
     uint16_t header_count;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderNeroRadio);
 
 struct SubGhzProtocolEncoderNeroRadio {
     SubGhzProtocolEncoderBase base;
@@ -32,7 +30,6 @@ struct SubGhzProtocolEncoderNeroRadio {
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
 };
-SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderNeroRadio);
 
 typedef enum {
     NeroRadioDecoderStepReset = 0,
@@ -43,24 +40,24 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_nero_radio_decoder = {
     .alloc = subghz_protocol_decoder_nero_radio_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_nero_radio_free,
 
     .feed = subghz_protocol_decoder_nero_radio_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_nero_radio_reset,
 
-    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
-    .serialize = subghz_protocol_decoder_common_serialize,
+    .get_hash_data = subghz_protocol_decoder_nero_radio_get_hash_data,
+    .serialize = subghz_protocol_decoder_nero_radio_serialize,
     .deserialize = subghz_protocol_decoder_nero_radio_deserialize,
     .get_string = subghz_protocol_decoder_nero_radio_get_string,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_nero_radio_encoder = {
     .alloc = subghz_protocol_encoder_nero_radio_alloc,
-    .free = subghz_protocol_encoder_common_free,
+    .free = subghz_protocol_encoder_nero_radio_free,
 
     .deserialize = subghz_protocol_encoder_nero_radio_deserialize,
-    .stop = subghz_protocol_encoder_common_stop,
-    .yield = subghz_protocol_encoder_common_yield,
+    .stop = subghz_protocol_encoder_nero_radio_stop,
+    .yield = subghz_protocol_encoder_nero_radio_yield,
 };
 
 const SubGhzProtocol subghz_protocol_nero_radio = {
@@ -75,8 +72,23 @@ const SubGhzProtocol subghz_protocol_nero_radio = {
 
 void* subghz_protocol_encoder_nero_radio_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderNeroRadio), &subghz_protocol_nero_radio, 3, 256);
+    SubGhzProtocolEncoderNeroRadio* instance = malloc(sizeof(SubGhzProtocolEncoderNeroRadio));
+
+    instance->base.protocol = &subghz_protocol_nero_radio;
+    instance->generic.protocol_name = instance->base.protocol->name;
+
+    instance->encoder.repeat = 10;
+    instance->encoder.size_upload = 256;
+    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
+    instance->encoder.is_running = false;
+    return instance;
+}
+
+void subghz_protocol_encoder_nero_radio_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolEncoderNeroRadio* instance = context;
+    free(instance->encoder.upload);
+    free(instance);
 }
 
 /**
@@ -105,7 +117,8 @@ static bool
     }
 
     //Send start bit
-    instance->encoder.upload[index++] = level_duration_make(true, (uint32_t)830);
+    instance->encoder.upload[index++] =
+        level_duration_make(true, (uint32_t)subghz_protocol_nero_radio_const.te_short * 4);
     instance->encoder.upload[index++] =
         level_duration_make(false, (uint32_t)subghz_protocol_nero_radio_const.te_short);
 
@@ -129,22 +142,14 @@ static bool
         //send bit 1
         instance->encoder.upload[index++] =
             level_duration_make(true, (uint32_t)subghz_protocol_nero_radio_const.te_long);
-        if(instance->generic.data_count_bit == 57) {
-            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)1300);
-        } else {
-            instance->encoder.upload[index++] = level_duration_make(
-                false, (uint32_t)subghz_protocol_nero_radio_const.te_short * 23);
-        }
+        instance->encoder.upload[index++] =
+            level_duration_make(false, (uint32_t)subghz_protocol_nero_radio_const.te_short * 37);
     } else {
         //send bit 0
         instance->encoder.upload[index++] =
             level_duration_make(true, (uint32_t)subghz_protocol_nero_radio_const.te_short);
-        if(instance->generic.data_count_bit == 57) {
-            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)1300);
-        } else {
-            instance->encoder.upload[index++] = level_duration_make(
-                false, (uint32_t)subghz_protocol_nero_radio_const.te_short * 23);
-        }
+        instance->encoder.upload[index++] =
+            level_duration_make(false, (uint32_t)subghz_protocol_nero_radio_const.te_short * 37);
     }
     return true;
 }
@@ -159,16 +164,10 @@ SubGhzProtocolStatus
             &instance->generic,
             flipper_format,
             subghz_protocol_nero_radio_const.min_count_bit_for_found);
-
-        if((ret == SubGhzProtocolStatusErrorValueBitCount) &&
-           (instance->generic.data_count_bit == 57)) {
-            ret = SubGhzProtocolStatusOk;
-        } else {
-            if(ret != SubGhzProtocolStatusOk) {
-                break;
-            }
+        if(ret != SubGhzProtocolStatusOk) {
+            break;
         }
-        // Optional value
+        //optional parameter parameter
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
@@ -182,10 +181,47 @@ SubGhzProtocolStatus
     return ret;
 }
 
+void subghz_protocol_encoder_nero_radio_stop(void* context) {
+    SubGhzProtocolEncoderNeroRadio* instance = context;
+    instance->encoder.is_running = false;
+}
+
+LevelDuration subghz_protocol_encoder_nero_radio_yield(void* context) {
+    SubGhzProtocolEncoderNeroRadio* instance = context;
+
+    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
+        instance->encoder.is_running = false;
+        return level_duration_reset();
+    }
+
+    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
+
+    if(++instance->encoder.front == instance->encoder.size_upload) {
+        instance->encoder.repeat--;
+        instance->encoder.front = 0;
+    }
+
+    return ret;
+}
+
 void* subghz_protocol_decoder_nero_radio_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    return subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderNeroRadio), &subghz_protocol_nero_radio);
+    SubGhzProtocolDecoderNeroRadio* instance = malloc(sizeof(SubGhzProtocolDecoderNeroRadio));
+    instance->base.protocol = &subghz_protocol_nero_radio;
+    instance->generic.protocol_name = instance->base.protocol->name;
+    return instance;
+}
+
+void subghz_protocol_decoder_nero_radio_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderNeroRadio* instance = context;
+    free(instance);
+}
+
+void subghz_protocol_decoder_nero_radio_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderNeroRadio* instance = context;
+    instance->decoder.parser_step = NeroRadioDecoderStepReset;
 }
 
 void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t duration) {
@@ -248,7 +284,8 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
         break;
     case NeroRadioDecoderStepCheckDuration:
         if(!level) {
-            if(duration >= ((uint32_t)1250)) {
+            if(duration >= ((uint32_t)subghz_protocol_nero_radio_const.te_short * 10 +
+                            subghz_protocol_nero_radio_const.te_delta * 2)) {
                 //Found stop bit
                 if(DURATION_DIFF(
                        instance->decoder.te_last, subghz_protocol_nero_radio_const.te_short) <
@@ -261,10 +298,8 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
                     subghz_protocol_blocks_add_bit(&instance->decoder, 1);
                 }
                 instance->decoder.parser_step = NeroRadioDecoderStepReset;
-                if((instance->decoder.decode_count_bit ==
-                    subghz_protocol_nero_radio_const.min_count_bit_for_found) ||
-                   (instance->decoder.decode_count_bit ==
-                    subghz_protocol_nero_radio_const.min_count_bit_for_found + 1)) {
+                if(instance->decoder.decode_count_bit ==
+                   subghz_protocol_nero_radio_const.min_count_bit_for_found) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
 
@@ -301,53 +336,30 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
     }
 }
 
+uint8_t subghz_protocol_decoder_nero_radio_get_hash_data(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderNeroRadio* instance = context;
+    return subghz_protocol_blocks_get_hash_data(
+        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
+}
+
+SubGhzProtocolStatus subghz_protocol_decoder_nero_radio_serialize(
+    void* context,
+    FlipperFormat* flipper_format,
+    SubGhzRadioPreset* preset) {
+    furi_assert(context);
+    SubGhzProtocolDecoderNeroRadio* instance = context;
+    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+}
+
 SubGhzProtocolStatus
     subghz_protocol_decoder_nero_radio_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
     SubGhzProtocolDecoderNeroRadio* instance = context;
-    SubGhzProtocolStatus stat;
-
-    stat = subghz_block_generic_deserialize_check_count_bit(
+    return subghz_block_generic_deserialize_check_count_bit(
         &instance->generic,
         flipper_format,
         subghz_protocol_nero_radio_const.min_count_bit_for_found);
-
-    if((stat == SubGhzProtocolStatusErrorValueBitCount) &&
-       (instance->generic.data_count_bit == 57)) {
-        return SubGhzProtocolStatusOk;
-    } else {
-        return stat;
-    }
-}
-
-/** 
- * Analysis of received data
- * @param instance Pointer to a SubGhzBlockGeneric* instance
- */
-static void subghz_protocol_nero_radio_parse_data(SubGhzBlockGeneric* instance) {
-    // Key samples from unit tests
-    // 57250501049DD3
-    // 57250502049D13
-    //
-    // Samples from remote
-    // 36E4E80104A644
-    // 36E4E80204A684
-    // 36E4E80304A604
-    // 36E4E80404A6E4
-
-    // possible contents
-    // serial  button serial/const  crc??
-    // 5725050 1      049D          D3
-    // 5725050 2      049D          13
-    // 36E4E80 1      04A6          44
-    // 36E4E80 2      04A6          84
-    // 36E4E80 3      04A6          04
-    // 36E4E80 4      04A6          E4
-
-    // serial is larger than uint32 can't fit into serial field
-    // using data2 var since its uint64_t
-    instance->btn = (instance->data >> 24) & 0xF;
-    instance->data_2 = ((instance->data >> 28) << 16) | ((instance->data >> 8) & 0xFFFF);
 }
 
 void subghz_protocol_decoder_nero_radio_get_string(void* context, FuriString* output) {
@@ -363,29 +375,15 @@ void subghz_protocol_decoder_nero_radio_get_string(void* context, FuriString* ou
     uint32_t code_found_reverse_hi = code_found_reverse >> 32;
     uint32_t code_found_reverse_lo = code_found_reverse & 0x00000000ffffffff;
 
-    subghz_protocol_nero_radio_parse_data(&instance->generic);
-
-    // push protocol data to global variable
-    subghz_block_generic_global.btn_is_available = false;
-    subghz_block_generic_global.current_btn = instance->generic.btn;
-    subghz_block_generic_global.btn_length_bit = 4;
-    //
-
     furi_string_cat_printf(
         output,
         "%s %dbit\r\n"
         "Key:0x%lX%08lX\r\n"
-        "Yek:0x%lX%08lX\r\n"
-        "Sn: 0x%llX \r\n"
-        "CRC?: 0x%02X\r\n"
-        "Btn: %X\r\n",
+        "Yek:0x%lX%08lX\r\n",
         instance->generic.protocol_name,
         instance->generic.data_count_bit,
         code_found_hi,
         code_found_lo,
         code_found_reverse_hi,
-        code_found_reverse_lo,
-        instance->generic.data_2,
-        (uint8_t)(instance->generic.data & 0xFF),
-        instance->generic.btn);
+        code_found_reverse_lo);
 }

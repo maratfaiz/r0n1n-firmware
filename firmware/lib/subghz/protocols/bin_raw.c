@@ -5,7 +5,6 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
-#include "common.h"
 #include <lib/toolbox/float_tools.h>
 #include <lib/toolbox/stream/stream.h>
 #include <lib/flipper_format/flipper_format_i.h>
@@ -78,7 +77,6 @@ struct SubGhzProtocolDecoderBinRAW {
     uint32_t te;
     float adaptive_threshold_rssi;
 };
-SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderBinRAW);
 
 struct SubGhzProtocolEncoderBinRAW {
     SubGhzProtocolEncoderBase base;
@@ -90,7 +88,6 @@ struct SubGhzProtocolEncoderBinRAW {
     BinRAW_Markup data_markup[BIN_RAW_MAX_MARKUP_COUNT];
     uint32_t te;
 };
-SUBGHZ_ASSERT_ENCODER_COMMON_LAYOUT(SubGhzProtocolEncoderBinRAW);
 
 const SubGhzProtocolDecoder subghz_protocol_bin_raw_decoder = {
     .alloc = subghz_protocol_decoder_bin_raw_alloc,
@@ -110,13 +107,13 @@ const SubGhzProtocolEncoder subghz_protocol_bin_raw_encoder = {
     .free = subghz_protocol_encoder_bin_raw_free,
 
     .deserialize = subghz_protocol_encoder_bin_raw_deserialize,
-    .stop = subghz_protocol_encoder_common_stop,
-    .yield = subghz_protocol_encoder_common_yield,
+    .stop = subghz_protocol_encoder_bin_raw_stop,
+    .yield = subghz_protocol_encoder_bin_raw_yield,
 };
 
 const SubGhzProtocol subghz_protocol_bin_raw = {
     .name = SUBGHZ_PROTOCOL_BIN_RAW_NAME,
-    .type = SubGhzProtocolTypeBinRAW,
+    .type = SubGhzProtocolTypeStatic,
 #ifdef BIN_RAW_DEBUG
     .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_315 | SubGhzProtocolFlag_868 |
             SubGhzProtocolFlag_AM | SubGhzProtocolFlag_FM | SubGhzProtocolFlag_Decodable |
@@ -145,7 +142,7 @@ void* subghz_protocol_encoder_bin_raw_alloc(SubGhzEnvironment* environment) {
     instance->base.protocol = &subghz_protocol_bin_raw;
     instance->generic.protocol_name = instance->base.protocol->name;
 
-    instance->encoder.repeat = 3;
+    instance->encoder.repeat = 10;
     instance->encoder.size_upload = BIN_RAW_BUF_DATA_SIZE * 5;
     instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
     instance->data = malloc(instance->encoder.size_upload * sizeof(uint8_t));
@@ -165,7 +162,7 @@ void subghz_protocol_encoder_bin_raw_free(void* context) {
 /**
  * Generating an upload from data.
  * @param instance Pointer to a SubGhzProtocolEncoderBinRAW instance
- * @return true Always; this encoder has no failure path
+ * @return true On success
  */
 static bool subghz_protocol_encoder_bin_raw_get_upload(SubGhzProtocolEncoderBinRAW* instance) {
     furi_assert(instance);
@@ -312,7 +309,7 @@ SubGhzProtocolStatus
             res = SubGhzProtocolStatusErrorParserOthers;
             break;
         }
-        // Optional value
+        //optional parameter parameter
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
@@ -329,10 +326,34 @@ SubGhzProtocolStatus
     return res;
 }
 
+void subghz_protocol_encoder_bin_raw_stop(void* context) {
+    SubGhzProtocolEncoderBinRAW* instance = context;
+    instance->encoder.is_running = false;
+}
+
+LevelDuration subghz_protocol_encoder_bin_raw_yield(void* context) {
+    SubGhzProtocolEncoderBinRAW* instance = context;
+
+    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
+        instance->encoder.is_running = false;
+        return level_duration_reset();
+    }
+
+    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
+
+    if(++instance->encoder.front == instance->encoder.size_upload) {
+        instance->encoder.repeat--;
+        instance->encoder.front = 0;
+    }
+
+    return ret;
+}
+
 void* subghz_protocol_decoder_bin_raw_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolDecoderBinRAW* instance = subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderBinRAW), &subghz_protocol_bin_raw);
+    SubGhzProtocolDecoderBinRAW* instance = malloc(sizeof(SubGhzProtocolDecoderBinRAW));
+    instance->base.protocol = &subghz_protocol_bin_raw;
+    instance->generic.protocol_name = instance->base.protocol->name;
     instance->data_raw_ind = 0;
     instance->data_raw = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
     instance->data = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));

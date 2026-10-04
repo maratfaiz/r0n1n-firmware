@@ -162,7 +162,7 @@ LevelDuration protocol_jablotron_encoder_yield(ProtocolJablotron* protocol) {
 
 void protocol_jablotron_render_data(ProtocolJablotron* protocol, FuriString* result) {
     uint64_t id = protocol_jablotron_card_id(protocol->data);
-    furi_string_printf(result, "Card: %llX", id);
+    furi_string_printf(result, "Карта: %llX", id);
 }
 
 bool protocol_jablotron_write_data(ProtocolJablotron* protocol, void* data) {
@@ -181,19 +181,6 @@ bool protocol_jablotron_write_data(ProtocolJablotron* protocol, void* data) {
         request->t5577.block[1] = bit_lib_get_bits_32(protocol->encoded_data, 0, 32);
         request->t5577.block[2] = bit_lib_get_bits_32(protocol->encoded_data, 32, 32);
         request->t5577.blocks_to_write = 3;
-        result = true;
-    } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-        request->em4305.word[4] =
-            (EM4x05_MODULATION_BIPHASE | EM4x05_SET_BITRATE(64) | (6 << EM4x05_MAXBLOCK_SHIFT));
-        uint32_t encoded_data_reversed[2] = {0};
-        for(uint8_t i = 0; i < 64; i++) {
-            encoded_data_reversed[i / 32] =
-                (encoded_data_reversed[i / 32] << 1) |
-                (bit_lib_get_bit(protocol->encoded_data, (63 - i)) & 1);
-        }
-        request->em4305.word[5] = encoded_data_reversed[1];
-        request->em4305.word[6] = encoded_data_reversed[0];
-        request->em4305.mask = 0x70;
         result = true;
     }
     return result;

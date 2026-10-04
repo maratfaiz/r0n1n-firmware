@@ -9,26 +9,18 @@
 #include <gui/elements.h>
 #include <gui/modules/file_browser_worker.h>
 #include <storage/storage.h>
-#include "../helpers/archive_files.h"
-#include "../helpers/archive_menu.h"
-#include "../helpers/archive_favorites.h"
-#include "gui/modules/file_browser_worker.h"
+#include <furi.h>
 
 #define MAX_LEN_PX   110
 #define MAX_NAME_LEN 255
 #define MAX_EXT_LEN  6
 #define FRAME_HEIGHT 12
-#define MENU_ITEMS   5u
+#define MENU_ITEMS   4u
 #define MOVE_OFFSET  5u
-
-#define CLIPBOARD_MODE_OFF  (0U)
-#define CLIPBOARD_MODE_CUT  (1U)
-#define CLIPBOARD_MODE_COPY (2U)
 
 typedef enum {
     ArchiveTabFavorites,
     ArchiveTabSubGhz,
-    ArchiveTabSubGhzRemote,
     ArchiveTabLFRFID,
     ArchiveTabNFC,
     ArchiveTabInfrared,
@@ -36,26 +28,17 @@ typedef enum {
     ArchiveTabBadUsb,
     ArchiveTabU2f,
     ArchiveTabApplications,
-    ArchiveTabInternal,
     ArchiveTabBrowser,
     ArchiveTabTotal,
 } ArchiveTabEnum;
 
 typedef enum {
-    ArchiveBrowserEventFileMenuNone,
     ArchiveBrowserEventFileMenuOpen,
+    ArchiveBrowserEventFileMenuClose,
     ArchiveBrowserEventFileMenuRun,
     ArchiveBrowserEventFileMenuPin,
     ArchiveBrowserEventFileMenuRename,
-    ArchiveBrowserEventFileMenuNewDir,
-    ArchiveBrowserEventFileMenuCut,
-    ArchiveBrowserEventFileMenuCopy,
-    ArchiveBrowserEventFileMenuPaste_Cut,
-    ArchiveBrowserEventFileMenuPaste_Copy,
     ArchiveBrowserEventFileMenuDelete,
-    ArchiveBrowserEventFileMenuInfo,
-    ArchiveBrowserEventFileMenuShow,
-    ArchiveBrowserEventFileMenuClose,
 
     ArchiveBrowserEventEnterDir,
 
@@ -72,6 +55,13 @@ typedef enum {
 
     ArchiveBrowserEventExit,
 } ArchiveBrowserEvent;
+
+static const uint8_t file_menu_actions[MENU_ITEMS] = {
+    [0] = ArchiveBrowserEventFileMenuRun,
+    [1] = ArchiveBrowserEventFileMenuPin,
+    [2] = ArchiveBrowserEventFileMenuRename,
+    [3] = ArchiveBrowserEventFileMenuDelete,
+};
 
 typedef struct ArchiveBrowserView ArchiveBrowserView;
 
@@ -101,11 +91,6 @@ typedef struct {
 
     uint8_t menu_idx;
     bool menu;
-    menu_array_t context_menu;
-    bool menu_file_manage;
-    bool menu_can_switch;
-    uint8_t clipboard_mode;
-
     bool move_fav;
     bool list_loading;
     bool folder_loading;
@@ -128,7 +113,3 @@ View* archive_browser_get_view(ArchiveBrowserView* browser);
 
 ArchiveBrowserView* browser_alloc(void);
 void browser_free(ArchiveBrowserView* browser);
-
-void archive_browser_clipboard_set_mode(ArchiveBrowserView* browser, uint8_t mode);
-
-void archive_browser_clipboard_reset(ArchiveBrowserView* browser);

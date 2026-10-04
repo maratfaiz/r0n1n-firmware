@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../protocol_common_i.h"
-#include "../../ibutton_write_targets.h"
 
 #include <one_wire/one_wire_host.h>
 #include <one_wire/one_wire_slave.h>
@@ -21,13 +20,12 @@ typedef void (*iButtonProtocolDallasApplyEditsFunc)(iButtonProtocolData*);
 typedef struct {
     const uint8_t family_code;
     const uint32_t features;
-    /** Blank types a write may try. Non-zero is what advertises WriteId. */
-    const iButtonWriteTargetMask write_targets;
     const size_t data_size;
     const char* manufacturer;
     const char* name;
 
     iButtonProtocolDallasReadWriteFunc read;
+    iButtonProtocolDallasReadWriteFunc write_id;
     iButtonProtocolDallasReadWriteFunc write_copy;
     iButtonProtocolDallasEmulateFunc emulate;
     iButtonProtocolDallasSaveFunc save;

@@ -12,23 +12,21 @@ void lfrfid_scene_start_on_enter(void* context) {
     Submenu* submenu = app->submenu;
 
     submenu_add_item(
-        submenu, "Read", LfRfidMenuIndexRead, lfrfid_scene_start_submenu_callback, app);
+        submenu, "Чтение", LfRfidMenuIndexRead, lfrfid_scene_start_submenu_callback, app);
     submenu_add_item(
-        submenu, "Saved", LfRfidMenuIndexSaved, lfrfid_scene_start_submenu_callback, app);
+        submenu, "Сохраненные", LfRfidMenuIndexSaved, lfrfid_scene_start_submenu_callback, app);
     submenu_add_item(
         submenu,
-        "Add Manually",
+        "Добавить вручную",
         LfRfidMenuIndexAddManually,
         lfrfid_scene_start_submenu_callback,
         app);
     submenu_add_item(
         submenu,
-        "Extra Actions",
+        "Доп. действия",
         LfRfidMenuIndexExtraActions,
         lfrfid_scene_start_submenu_callback,
         app);
-    submenu_add_item(
-        submenu, "Settings", LfRfidMenuIndexSettings, lfrfid_scene_start_submenu_callback, app);
 
     submenu_set_selected_item(
         submenu, scene_manager_get_scene_state(app->scene_manager, LfRfidSceneStart));
@@ -69,11 +67,6 @@ bool lfrfid_scene_start_on_event(void* context, SceneManagerEvent event) {
             scene_manager_set_scene_state(
                 app->scene_manager, LfRfidSceneStart, LfRfidMenuIndexExtraActions);
             scene_manager_next_scene(app->scene_manager, LfRfidSceneExtraActions);
-            consumed = true;
-        } else if(event.event == LfRfidMenuIndexSettings) {
-            scene_manager_set_scene_state(
-                app->scene_manager, LfRfidSceneStart, LfRfidMenuIndexSettings);
-            scene_manager_next_scene(app->scene_manager, LfRfidSceneSettings);
             consumed = true;
         }
     }

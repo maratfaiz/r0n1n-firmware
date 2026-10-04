@@ -4,8 +4,6 @@ enum SubmenuIndex {
     SubmenuIndexReadCardType,
     SubmenuIndexMfClassicKeys,
     SubmenuIndexMfUltralightCKeys,
-    SubmenuIndexMfUltralightAesKeys,
-    SubmenuIndexMfPlusKeys,
     SubmenuIndexMfUltralightUnlock,
     SubmenuIndexSlixUnlock,
 };
@@ -22,43 +20,31 @@ void nfc_scene_extra_actions_on_enter(void* context) {
 
     submenu_add_item(
         submenu,
-        "Read Specific Card Type",
+        "Читать тип карты",
         SubmenuIndexReadCardType,
         nfc_scene_extra_actions_submenu_callback,
         instance);
     submenu_add_item(
         submenu,
-        "MIFARE Classic Keys",
+        "Ключи MIFARE Classic",
         SubmenuIndexMfClassicKeys,
         nfc_scene_extra_actions_submenu_callback,
         instance);
     submenu_add_item(
         submenu,
-        "MIFARE Plus Keys",
-        SubmenuIndexMfPlusKeys,
-        nfc_scene_extra_actions_submenu_callback,
-        instance);
-    submenu_add_item(
-        submenu,
-        "MIFARE Ultralight C Keys",
+        "Ключи MIFARE Ultralight C",
         SubmenuIndexMfUltralightCKeys,
         nfc_scene_extra_actions_submenu_callback,
         instance);
     submenu_add_item(
         submenu,
-        "MIFARE UL AES Keys",
-        SubmenuIndexMfUltralightAesKeys,
-        nfc_scene_extra_actions_submenu_callback,
-        instance);
-    submenu_add_item(
-        submenu,
-        "Unlock NTAG/Ultralight",
+        "Разблок. NTAG/Ultralight",
         SubmenuIndexMfUltralightUnlock,
         nfc_scene_extra_actions_submenu_callback,
         instance);
     submenu_add_item(
         submenu,
-        "Unlock SLIX-L",
+        "Разблок. SLIX-L",
         SubmenuIndexSlixUnlock,
         nfc_scene_extra_actions_submenu_callback,
         instance);
@@ -73,20 +59,10 @@ bool nfc_scene_extra_actions_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubmenuIndexMfClassicKeys) {
-            instance->key_dict_type = NfcKeyDictTypeMfClassic;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDict);
+            scene_manager_next_scene(instance->scene_manager, NfcSceneMfClassicKeys);
             consumed = true;
         } else if(event.event == SubmenuIndexMfUltralightCKeys) {
-            instance->key_dict_type = NfcKeyDictTypeMfUltralightC;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDict);
-            consumed = true;
-        } else if(event.event == SubmenuIndexMfUltralightAesKeys) {
-            instance->key_dict_type = NfcKeyDictTypeMfUltralightAes;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDict);
-            consumed = true;
-        } else if(event.event == SubmenuIndexMfPlusKeys) {
-            instance->key_dict_type = NfcKeyDictTypeMfPlus;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDict);
+            scene_manager_next_scene(instance->scene_manager, NfcSceneMfUltralightCKeys);
             consumed = true;
         } else if(event.event == SubmenuIndexMfUltralightUnlock) {
             mf_ultralight_auth_reset(instance->mf_ul_auth);

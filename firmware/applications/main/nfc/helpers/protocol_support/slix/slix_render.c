@@ -6,13 +6,13 @@ void nfc_render_slix_info(const SlixData* data, NfcProtocolFormatType format_typ
     if(format_type != NfcProtocolFormatTypeFull) return;
     const SlixType slix_type = slix_get_type(data);
 
-    furi_string_cat(str, "\n::::::::::::::::::[Passwords]:::::::::::::::::\n");
+    furi_string_cat(str, "\n:::::::::::::::::::[Пароли]:::::::::::::::::::\n");
 
     static const char* slix_password_names[] = {
-        "Read",
-        "Write",
-        "Privacy",
-        "Destroy",
+        "Чтение",
+        "Записать",
+        "Приватность",
+        "Уничтожить",
         "EAS/AFI",
     };
 
@@ -23,39 +23,39 @@ void nfc_render_slix_info(const SlixData* data, NfcProtocolFormatType format_typ
         }
     }
 
-    furi_string_cat(str, ":::::::::::::::::::[Lock bits]::::::::::::::::::::\n");
+    furi_string_cat(str, ":::::::::::::::::[Биты блок.]:::::::::::::::::\n");
 
     if(slix_type_has_features(slix_type, SLIX_TYPE_FEATURE_EAS)) {
         furi_string_cat_printf(
-            str, "EAS: %s locked\n", data->system_info.lock_bits.eas ? "" : "not");
+            str, "EAS: %sзаблок.\n", data->system_info.lock_bits.eas ? "" : "не ");
     }
 
     if(slix_type_has_features(slix_type, SLIX_TYPE_FEATURE_PROTECTION)) {
         furi_string_cat_printf(
-            str, "PPL: %s locked\n", data->system_info.lock_bits.ppl ? "" : "not");
+            str, "PPL: %sзаблок.\n", data->system_info.lock_bits.ppl ? "" : "не ");
 
         const SlixProtection protection = data->system_info.protection;
 
-        furi_string_cat(str, "::::::::::::[Page protection]::::::::::::\n");
-        furi_string_cat_printf(str, "Pointer: H >= %02X\n", protection.pointer);
+        furi_string_cat(str, "::::::::::::[Защита страниц]::::::::::::\n");
+        furi_string_cat_printf(str, "Указатель: В >= %02X\n", protection.pointer);
 
-        const char* rh = (protection.condition & SLIX_PP_CONDITION_RH) ? "" : "un";
-        const char* rl = (protection.condition & SLIX_PP_CONDITION_RL) ? "" : "un";
+        const char* rh = (protection.condition & SLIX_PP_CONDITION_RH) ? "" : "не ";
+        const char* rl = (protection.condition & SLIX_PP_CONDITION_RL) ? "" : "не ";
 
-        const char* wh = (protection.condition & SLIX_PP_CONDITION_WH) ? "" : "un";
-        const char* wl = (protection.condition & SLIX_PP_CONDITION_WL) ? "" : "un";
+        const char* wh = (protection.condition & SLIX_PP_CONDITION_WH) ? "" : "не ";
+        const char* wl = (protection.condition & SLIX_PP_CONDITION_WL) ? "" : "не ";
 
-        furi_string_cat_printf(str, "R:  H %sprotec. L %sprotec.\n", rh, rl);
-        furi_string_cat_printf(str, "W: H %sprotec. L %sprotec.\n", wh, wl);
+        furi_string_cat_printf(str, "Чт: В %sзащ. Н %sзащ.\n", rh, rl);
+        furi_string_cat_printf(str, "Зп: В %sзащ. Н %sзащ.\n", wh, wl);
     }
 
     if(slix_type_has_features(slix_type, SLIX_TYPE_FEATURE_PRIVACY)) {
-        furi_string_cat(str, "::::::::::::::::::::[Privacy]::::::::::::::::::::::\n");
-        furi_string_cat_printf(str, "Privacy mode: %sabled\n", data->privacy ? "en" : "dis");
+        furi_string_cat(str, ":::::::::::::::::[Приватность]:::::::::::::::::\n");
+        furi_string_cat_printf(str, "Приватность: %s\n", data->privacy ? "вкл" : "выкл");
     }
 
     if(slix_type_has_features(slix_type, SLIX_TYPE_FEATURE_SIGNATURE)) {
-        furi_string_cat(str, ":::::::::::::::::::[Signature]::::::::::::::::::\n");
+        furi_string_cat(str, ":::::::::::::::::::[Подпись]:::::::::::::::::::\n");
         for(uint32_t i = 0; i < 4; ++i) {
             furi_string_cat_printf(str, "%02X ", data->signature[i]);
         }
@@ -67,6 +67,6 @@ void nfc_render_slix_info(const SlixData* data, NfcProtocolFormatType format_typ
         }
     }
 
-    furi_string_cat(str, "\n\e#ISO15693-3 data");
+    furi_string_cat(str, "\n\e#Данные ISO15693-3");
     nfc_render_iso15693_3_extra(slix_get_base_data(data), str);
 }

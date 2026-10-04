@@ -159,7 +159,6 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             gap->connection_params.supervisor_timeout = event->Supervision_Timeout;
             FURI_LOG_I(TAG, "Connection parameters event complete");
             gap_verify_connection_parameters(gap);
-
             break;
         }
 
@@ -194,7 +193,6 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             gap->service.connection_handle = event->Connection_Handle;
 
             gap_verify_connection_parameters(gap);
-
             if(gap->config->pairing_method != GapPairingNone) {
                 // Start pairing by sending security request
                 aci_gap_slave_security_req(event->Connection_Handle);
@@ -356,7 +354,7 @@ static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
     // Initialize GATT interface
     aci_gatt_init();
     // Initialize GAP interface
-    // Skip first symbol AD_TYPE_COMPLETE_LOCAL_NAME
+    // Skip fist symbol AD_TYPE_COMPLETE_LOCAL_NAME
     char* name = gap->service.adv_name + 1;
     aci_gap_init(
         GAP_PERIPHERAL_ROLE,
@@ -526,7 +524,7 @@ void gap_stop_advertising(void) {
     furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
 }
 
-static void gap_advertise_timer_callback(void* context) {
+static void gap_advetise_timer_callback(void* context) {
     UNUSED(context);
     GapCommand command = GapCommandAdvLowPower;
     furi_check(furi_message_queue_put(gap->command_queue, &command, 0) == FuriStatusOk);
@@ -546,7 +544,7 @@ bool gap_init(
     gap = malloc(sizeof(Gap));
     gap->config = config;
     // Create advertising timer
-    gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
+    gap->advertise_timer = furi_timer_alloc(gap_advetise_timer_callback, FuriTimerTypeOnce, NULL);
     // Initialization of GATT & GAP layer
     gap->service.adv_name = config->adv_name;
     gap_init_svc(gap, root_keys);

@@ -39,7 +39,6 @@ Brewfile.lock.json
 
 # kde
 .directory
-null.d
 
 # SCons
 .sconsign.dblite
@@ -47,11 +46,6 @@ null.d
 
 # bundle output
 /dist
-/artifacts-default
-/artifacts-ofw-anims
-/artifacts-rgb-patch
-/artifacts-extra-apps
-/artifacts-clean
 
 # SCons build dir
 /build

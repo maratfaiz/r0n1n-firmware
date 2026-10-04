@@ -353,6 +353,21 @@ static FS_Error storage_process_common_stat(Storage* app, FuriString* path, File
     return ret;
 }
 
+static FS_Error storage_process_common_mtime(Storage* app, FuriString* path, uint32_t* timestamp) {
+    StorageData* storage;
+    FS_Error ret = storage_get_data(app, path, &storage);
+
+    if(ret == FSE_OK) {
+        if(storage->fs_api->common.mtime) {
+            FS_CALL(storage, common.mtime(storage, cstr_path_without_vfs_prefix(path), timestamp));
+        } else {
+            ret = FSE_NOT_IMPLEMENTED;
+        }
+    }
+
+    return ret;
+}
+
 static FS_Error storage_process_common_remove(Storage* app, FuriString* path) {
     StorageData* storage;
     FS_Error ret = storage_get_data(app, path, &storage);
@@ -665,6 +680,12 @@ void storage_process_message_internal(Storage* app, StorageMessage* message) {
         storage_process_alias(app, path, message->data->cstat.thread_id, false);
         message->return_data->error_value =
             storage_process_common_stat(app, path, message->data->cstat.fileinfo);
+        break;
+    case StorageCommandCommonMtime:
+        path = furi_string_alloc_set(message->data->ctimestamp.path);
+        storage_process_alias(app, path, message->data->ctimestamp.thread_id, false);
+        message->return_data->error_value =
+            storage_process_common_mtime(app, path, message->data->ctimestamp.timestamp);
         break;
     case StorageCommandCommonRemove:
         path = furi_string_alloc_set(message->data->path.path);

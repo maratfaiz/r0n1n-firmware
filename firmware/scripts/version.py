@@ -35,17 +35,10 @@ class GitVersion:
             or "unknown"
         )
 
-        version = (
-            os.environ.get("DIST_SUFFIX", None)
-            or "unknown"
-        )
-
-        force_no_dirty = (
-            os.environ.get("FORCE_NO_DIRTY", None)
-            or ""
-        )
-        if (force_no_dirty != ""):
-            dirty = False
+        try:
+            version = self._exec_git("describe --tags --abbrev=0 --exact-match")
+        except subprocess.CalledProcessError:
+            version = "unknown"
 
         if "SOURCE_DATE_EPOCH" in os.environ:
             commit_date = datetime.utcfromtimestamp(
@@ -62,11 +55,9 @@ class GitVersion:
             "GIT_BRANCH": branch,
             "VERSION": version,
             "BUILD_DIRTY": dirty and 1 or 0,
-            "GIT_ORIGIN": "https://github.com/maratfaiz/r0n1n",
+            "GIT_ORIGIN": ",".join(self._get_git_origins()),
             "GIT_COMMIT_DATE": commit_date,
         }
-    
-    # "GIT_ORIGIN": ",".join(self._get_git_origins()),
 
     def _get_git_origins(self):
         try:
@@ -175,7 +166,6 @@ class Main(App):
             "firmware_commit": current_info["GIT_COMMIT"],
             "firmware_branch": current_info["GIT_BRANCH"],
             "firmware_target": current_info["TARGET"],
-            "firmware_version": current_info["VERSION"],
         }
         with open(version_json_name, "w", newline="\n") as file:
             json.dump(version_json, file, indent=4)

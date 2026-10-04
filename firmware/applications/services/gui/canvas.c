@@ -1,18 +1,21 @@
 #include "canvas_i.h"
-#include "canvas.h"
 #include "icon_animation_i.h"
 
 #include <furi.h>
 #include <furi_hal.h>
 #include <stdint.h>
 #include <u8g2_glue.h>
+#include "utf8_i.h"
+
+// R0N1N: see canvas_draw_utf8()
+#define CANVAS_PRIMARY_FONT  u8g2_font_helvB08_tr
+#define CANVAS_CYRILLIC_FONT u8g2_font_haxrcorp4089_t_cyrillic
 
 const CanvasFontParameters canvas_font_params[FontTotalNumber] = {
     [FontPrimary] = {.leading_default = 12, .leading_min = 11, .height = 8, .descender = 2},
     [FontSecondary] = {.leading_default = 11, .leading_min = 9, .height = 7, .descender = 2},
     [FontKeyboard] = {.leading_default = 11, .leading_min = 9, .height = 7, .descender = 2},
     [FontBigNumbers] = {.leading_default = 18, .leading_min = 16, .height = 15, .descender = 0},
-    [FontBatteryPercent] = {.leading_default = 11, .leading_min = 9, .height = 6, .descender = 0},
 };
 
 Canvas* canvas_init(void) {
@@ -129,11 +132,6 @@ size_t canvas_current_font_height(const Canvas* canvas) {
     return font_height;
 }
 
-size_t canvas_current_font_width(const Canvas* canvas) {
-    furi_assert(canvas);
-    return (size_t)u8g2_GetMaxCharWidth(&canvas->fb);
-}
-
 const CanvasFontParameters* canvas_get_font_params(const Canvas* canvas, Font font) {
     furi_check(canvas);
     furi_check(font < FontTotalNumber);
@@ -163,15 +161,16 @@ void canvas_set_font(Canvas* canvas, Font font) {
     furi_check(canvas);
     u8g2_SetFontMode(&canvas->fb, 1);
     if(font == FontPrimary) {
-        u8g2_SetFont(&canvas->fb, u8g2_font_helvB08_tr);
+        u8g2_SetFont(&canvas->fb, CANVAS_PRIMARY_FONT);
     } else if(font == FontSecondary) {
-        u8g2_SetFont(&canvas->fb, u8g2_font_haxrcorp4089_tr);
+        // R0N1N: the same face with Cyrillic added (Russian UI). Its max char
+        // height is 11, i.e. what canvas_current_font_height() already reports
+        // for the Latin-only variant, so line spacing everywhere is unchanged.
+        u8g2_SetFont(&canvas->fb, u8g2_font_haxrcorp4089_t_cyrillic);
     } else if(font == FontKeyboard) {
         u8g2_SetFont(&canvas->fb, u8g2_font_profont11_mr);
     } else if(font == FontBigNumbers) {
         u8g2_SetFont(&canvas->fb, u8g2_font_profont22_tn);
-    } else if(font == FontBatteryPercent) {
-        u8g2_SetFont(&canvas->fb, u8g2_font_5x7_tr); //u8g2_font_micro_tr);
     } else {
         furi_crash();
     }
@@ -183,12 +182,65 @@ void canvas_set_custom_u8g2_font(Canvas* canvas, const uint8_t* font) {
     u8g2_SetFont(&canvas->fb, font);
 }
 
+// R0N1N: FontPrimary (helvB08) has no Cyrillic. A FontPrimary string with
+// any non-ASCII character is drawn in the Cyrillic FontSecondary face instead,
+// struck twice one pixel apart as bold, each glyph advancing one pixel more so
+// the letters don't merge. ASCII-only strings keep the stock look
+// (CANVAS_PRIMARY_FONT, CANVAS_CYRILLIC_FONT at the top of the file).
+
+static bool canvas_needs_cyrillic_bold(const Canvas* canvas, const char* str) {
+    if(canvas->fb.font != CANVAS_PRIMARY_FONT) return false;
+    for(; *str; str++) {
+        if((uint8_t)*str >= 0x80) return true;
+    }
+    return false;
+}
+
+static uint16_t canvas_cyrillic_bold_width(Canvas* canvas, const char* str) {
+    u8g2_SetFont(&canvas->fb, CANVAS_CYRILLIC_FONT);
+    uint16_t width = u8g2_GetUTF8Width(&canvas->fb, str);
+    uint16_t code;
+    for(const char* p = str; *p;) {
+        p += gui_utf8_char(p, &code);
+        width++;
+    }
+    u8g2_SetFont(&canvas->fb, CANVAS_PRIMARY_FONT);
+    return width;
+}
+
+static void canvas_draw_cyrillic_bold(Canvas* canvas, int32_t x, int32_t y, const char* str) {
+    // XOR would cancel the double strike out, so it gets a single one
+    const bool strike_twice = canvas->fb.draw_color != ColorXOR;
+    u8g2_SetFont(&canvas->fb, CANVAS_CYRILLIC_FONT);
+    uint16_t code;
+    while(*str) {
+        str += gui_utf8_char(str, &code);
+        int8_t dx = u8g2_DrawGlyph(&canvas->fb, x, y, code);
+        if(strike_twice) u8g2_DrawGlyph(&canvas->fb, x + 1, y, code);
+        x += dx + 1;
+    }
+    u8g2_SetFont(&canvas->fb, CANVAS_PRIMARY_FONT);
+}
+
+static uint16_t canvas_utf8_width(Canvas* canvas, const char* str) {
+    if(canvas_needs_cyrillic_bold(canvas, str)) return canvas_cyrillic_bold_width(canvas, str);
+    return u8g2_GetUTF8Width(&canvas->fb, str);
+}
+
+static void canvas_draw_utf8(Canvas* canvas, int32_t x, int32_t y, const char* str) {
+    if(canvas_needs_cyrillic_bold(canvas, str)) {
+        canvas_draw_cyrillic_bold(canvas, x, y, str);
+    } else {
+        u8g2_DrawUTF8(&canvas->fb, x, y, str);
+    }
+}
+
 void canvas_draw_str(Canvas* canvas, int32_t x, int32_t y, const char* str) {
     furi_check(canvas);
     if(!str) return;
     x += canvas->offset_x;
     y += canvas->offset_y;
-    u8g2_DrawUTF8(&canvas->fb, x, y, str);
+    canvas_draw_utf8(canvas, x, y, str);
 }
 
 void canvas_draw_str_aligned(
@@ -207,10 +259,10 @@ void canvas_draw_str_aligned(
     case AlignLeft:
         break;
     case AlignRight:
-        x -= u8g2_GetUTF8Width(&canvas->fb, str);
+        x -= canvas_utf8_width(canvas, str);
         break;
     case AlignCenter:
-        x -= (u8g2_GetUTF8Width(&canvas->fb, str) / 2);
+        x -= (canvas_utf8_width(canvas, str) / 2);
         break;
     default:
         furi_crash();
@@ -231,17 +283,23 @@ void canvas_draw_str_aligned(
         break;
     }
 
-    u8g2_DrawUTF8(&canvas->fb, x, y, str);
+    canvas_draw_utf8(canvas, x, y, str);
 }
 
 uint16_t canvas_string_width(Canvas* canvas, const char* str) {
     furi_check(canvas);
     if(!str) return 0;
-    return u8g2_GetUTF8Width(&canvas->fb, str);
+    return canvas_utf8_width(canvas, str);
 }
 
 size_t canvas_glyph_width(Canvas* canvas, uint16_t symbol) {
     furi_check(canvas);
+    if(symbol >= 0x80 && canvas->fb.font == CANVAS_PRIMARY_FONT) {
+        u8g2_SetFont(&canvas->fb, CANVAS_CYRILLIC_FONT);
+        size_t width = u8g2_GetGlyphWidth(&canvas->fb, symbol) + 1;
+        u8g2_SetFont(&canvas->fb, CANVAS_PRIMARY_FONT);
+        return width;
+    }
     return u8g2_GetGlyphWidth(&canvas->fb, symbol);
 }
 
@@ -542,24 +600,15 @@ void canvas_draw_glyph(Canvas* canvas, int32_t x, int32_t y, uint16_t ch) {
     furi_check(canvas);
     x += canvas->offset_x;
     y += canvas->offset_y;
+    if(ch >= 0x80 && canvas->fb.font == CANVAS_PRIMARY_FONT) {
+        // Same bold Cyrillic as canvas_draw_cyrillic_bold()
+        u8g2_SetFont(&canvas->fb, CANVAS_CYRILLIC_FONT);
+        u8g2_DrawGlyph(&canvas->fb, x, y, ch);
+        if(canvas->fb.draw_color != ColorXOR) u8g2_DrawGlyph(&canvas->fb, x + 1, y, ch);
+        u8g2_SetFont(&canvas->fb, CANVAS_PRIMARY_FONT);
+        return;
+    }
     u8g2_DrawGlyph(&canvas->fb, x, y, ch);
-}
-
-void canvas_draw_icon_bitmap(
-    Canvas* canvas,
-    uint8_t x,
-    uint8_t y,
-    int16_t w,
-    int16_t h,
-    const Icon* icon) {
-    furi_assert(canvas);
-    furi_assert(icon);
-
-    x += canvas->offset_x;
-    y += canvas->offset_y;
-    uint8_t* icon_data = NULL;
-    compress_icon_decode(canvas->compress_icon, icon_get_frame_data(icon, 0), &icon_data);
-    u8g2_DrawXBM(&canvas->fb, x, y, w, h, icon_data);
 }
 
 void canvas_set_bitmap_mode(Canvas* canvas, bool alpha) {

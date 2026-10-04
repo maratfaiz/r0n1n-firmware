@@ -7,11 +7,11 @@ static void nfc_scene_read_setup_view(NfcApp* instance) {
 
     if(state == NfcSceneReadMenuStateCardSearch) {
         popup_set_icon(instance->popup, 0, 8, &I_NFC_manual_60x50);
-        popup_set_header(instance->popup, "Unlocking", 97, 15, AlignCenter, AlignTop);
+        popup_set_header(instance->popup, "Разблок...", 97, 15, AlignCenter, AlignTop);
         popup_set_text(
-            instance->popup, "Hold card next\nto Flipper's back", 94, 27, AlignCenter, AlignTop);
+            instance->popup, "Приложите\nкарту к задней\nстороне", 94, 27, AlignCenter, AlignTop);
     } else {
-        popup_set_header(instance->popup, "Don't move", 85, 27, AlignCenter, AlignTop);
+        popup_set_header(instance->popup, "Не двигайте", 85, 27, AlignCenter, AlignTop);
         popup_set_icon(instance->popup, 12, 20, &A_Loading_24);
     }
 
@@ -19,19 +19,10 @@ static void nfc_scene_read_setup_view(NfcApp* instance) {
 }
 
 void nfc_unlock_helper_setup_from_state(NfcApp* instance) {
-    // Every read enters through here, and this is the one place that knows whether the read was
-    // started from an unlock/reveal warn. Anything else is a plain read, which must carry no auth
-    // intent: a UL-AES key left over from an aborted reveal/unlock re-read would otherwise
-    // auto-authenticate the next card and silently spend an AUTHLIM attempt (bricking it eventually).
     bool unlocking =
         scene_manager_has_previous_scene(
             instance->scene_manager, NfcSceneMfUltralightUnlockWarn) ||
-        scene_manager_has_previous_scene(instance->scene_manager, NfcSceneDesAuthUnlockWarn) ||
-        // UL-AES "Reveal Real UID" re-reads via this warn scene, so treat it as an unlock too.
-        scene_manager_has_previous_scene(
-            instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn);
-
-    if(!unlocking) mf_ultralight_auth_reset(instance->mf_ul_auth);
+        scene_manager_has_previous_scene(instance->scene_manager, NfcSceneDesAuthUnlockWarn);
 
     uint32_t state = unlocking ? NfcSceneReadMenuStateCardSearch : NfcSceneReadMenuStateCardFound;
 

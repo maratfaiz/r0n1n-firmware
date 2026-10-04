@@ -2,9 +2,10 @@
 
 ## Base decision
 
-A fork of **Unleashed** (see `FIRMWARE_LANDSCAPE.md` for why this base was
-chosen); UX components are ported and reworked from **Momentum**. We're not
-writing an OS from scratch — that would break compatibility with the app
+A fork of the **official Flipper Zero firmware**, currently release 1.4.3
+(see `FIRMWARE_LANDSCAPE.md` for why this base was chosen); R0N1N's UX
+components are written for it, not copied from other custom firmwares.
+We're not writing an OS from scratch — that would break compatibility with the app
 catalog and throw away years of community work on radio-stack stability,
 drivers, and the HAL.
 
@@ -12,16 +13,16 @@ drivers, and the HAL.
 
 1. **Hardware / `furi_hal`** — nothing below the HAL is touched; we work
    only through the public `furi_hal`, never directly against the STM32
-   HAL — a precondition for cross-compatibility with upstream and future
-   Unleashed updates.
+   HAL — a precondition for staying compatible with future official
+   releases.
 2. **FreeRTOS + Furi (Furi OS)** — the scheduler, threads, records
    (`record_open`/`record_close`), services. Not modified.
 3. **Services** — GUI/`ViewDispatcher`, storage (LittleFS + SD), input,
    notification, RPC (control over USB/BLE — the companion transport, see
    `COMPANION.md`), BLE.
 4. **Core apps** — Sub-GHz, NFC, RFID, IR, GPIO, iButton, BadUSB, U2F —
-   inherited from Unleashed with almost no logic changes, only integration
-   points with the new UX layer (see below).
+   inherited from the official firmware with almost no logic changes, only
+   integration points with the new UX layer (see below).
 5. **R0N1N layer** — the project's main technical contribution,
    implemented mostly as system apps/services on top of Furi so the
    monolith doesn't grow:
@@ -55,12 +56,12 @@ that might exist":
 - R0N1N services must be "lazy": data (the search index, Capture Timeline)
   lives on SD, with only the current screen's working set in RAM.
 - **Design goal:** the R0N1N layer must not make free heap worse than
-  stock Unleashed on the same API version — measurable, verified during
+  the stock official firmware on the same API version — measurable, verified during
   the prototype stage (`ROADMAP.md`, Stage 1).
 
 ## Firmware updates
 
-The OFW/Unleashed mechanism is kept as-is: the update package is written to
+The official update mechanism is kept as-is: the update package is written to
 SD at `/ext/update/`, applied offline on reboot by a small bootloader,
 without touching user data; DFU via qFlipper serves as emergency recovery.
 Signed releases, a public changelog.
@@ -88,15 +89,31 @@ the companion.
 
 Stage 1 (see `ROADMAP.md`) settled this for the pieces it touched, by
 building them rather than by deciding up front. Home, Control Center,
-Quick Actions, and Recent are all new scenes/views inside Unleashed's
-existing `desktop` service (`firmware/applications/services/desktop/`),
+Quick Actions, and Recent are all new scenes/views inside the official
+firmware's existing `desktop` service (`firmware/applications/services/desktop/`),
 not separate FAP apps — because they need to *replace and extend* that
 service's own Home screen, input law, and view stack, which isn't
 something a FAP sitting on top of the public SDK can reach into. The one
 change outside `desktop/` was additive and minimal: a `name` field on
 `LoaderEvent` (`loader.h`), needed for Recent to know what app was about
-to launch, populated at a single call site, every other subscriber
-unaffected.
+to launch, set only when the Loader isn't already running an app, every
+other subscriber unaffected. One consequence specific to the official base:
+Archive isn't a Loader app there and was only reachable from Down on Home,
+so with Down given to Control Center, Quick Actions carries a fixed Archive
+entry (`desktop_run_archive` in `desktop.c`).
+
+The v2 interface kept the same pattern and added to it: every R0N1N screen
+(sections, menu, profiles, search, captures, Hub, Dev tools) is a desktop
+scene, and they share one instance each of three new GUI modules —
+`R0n1nList`, `R0n1nGrid`, `R0n1nCarousel` (`gui/modules/`), drawn with
+`gui/r0n1n_ui.c` — reset on scene entry, so extra screens cost almost no
+RAM. Screens report actions as custom events tagged in their high bits, so
+a list index can never collide with the desktop's global events. Two small
+additions outside `desktop/`: FontSecondary uses the Cyrillic variant of the
+same face (`canvas.c`), and `storage_common_mtime()` (a new storage command,
+`storage/storage_mtime.h`) gives a file's own modification time for the
+Capture Timeline — deliberately not an SDK function, since `FileInfo` can't
+grow without breaking apps that allocate it.
 
 ## Open question (Stage 2 and later)
 

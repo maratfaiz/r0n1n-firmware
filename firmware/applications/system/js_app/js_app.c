@@ -49,18 +49,18 @@ static void js_callback(JsThreadEvent event, const char* msg, void* context) {
 
     if(event == JsThreadEventDone) {
         FURI_LOG_I(TAG, "Script done");
-        console_view_print(app->console_view, "--- DONE ---");
+        console_view_print(app->console_view, "--- ГОТОВО ---");
     } else if(event == JsThreadEventPrint) {
         console_view_print(app->console_view, msg);
     } else if(event == JsThreadEventError) {
-        console_view_print(app->console_view, "--- ERROR ---");
+        console_view_print(app->console_view, "--- ОШИБКА ---");
         console_view_print(app->console_view, msg);
     } else if(event == JsThreadEventErrorTrace) {
         FuriString* compact_trace = furi_string_alloc_set_str(msg);
         js_app_compact_trace(compact_trace);
         console_view_print(app->console_view, furi_string_get_cstr(compact_trace));
         furi_string_free(compact_trace);
-        console_view_print(app->console_view, "See logs for full trace");
+        console_view_print(app->console_view, "Подробности в логах");
     }
 }
 
@@ -113,8 +113,7 @@ int32_t js_app(void* arg) {
         }
         FuriString* name = furi_string_alloc();
         path_extract_filename(script_path, name, false);
-        FuriString* start_text =
-            furi_string_alloc_printf("Running %s", furi_string_get_cstr(name));
+        FuriString* start_text = furi_string_alloc_printf("Запуск %s", furi_string_get_cstr(name));
         console_view_print(app->console_view, furi_string_get_cstr(start_text));
         console_view_print(app->console_view, "-------------");
         furi_string_free(name);
@@ -208,4 +207,10 @@ void js_cli_execute(PipeSide* pipe, FuriString* args, void* context) {
     furi_record_close(RECORD_STORAGE);
 }
 
-CLI_COMMAND_INTERFACE(js, js_cli_execute, CliCommandFlagDefault, 1024, CLI_APPID);
+void js_app_on_system_start(void) {
+#ifdef SRV_CLI
+    CliRegistry* registry = furi_record_open(RECORD_CLI);
+    cli_registry_add_command(registry, "js", CliCommandFlagDefault, js_cli_execute, NULL);
+    furi_record_close(RECORD_CLI);
+#endif
+}

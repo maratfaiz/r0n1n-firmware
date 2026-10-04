@@ -24,7 +24,7 @@ repositories as of this writing (September 2026) are marked as confirmed.
   stack + FUS, ~700 KB for the main firmware, with the rest shared by the
   dynamic LittleFS. Treat this as a rough guide, not a guarantee — before
   budgeting memory for the R0N1N layer, measure actual free flash/heap on
-  the target Unleashed build rather than relying on the community estimate
+  the actual R0N1N build rather than relying on the community estimate
   above.
 - **Screen:** monochrome 128×64 LCD, ST7567 controller, SPI, 1.4" —
   confirmed. 5-button D-pad + Back. No touchscreen.
@@ -112,32 +112,33 @@ exceeding the platform's physical limits. UX and architecture decisions
   the UI;
 - keep heavy data (search indexes, the capture timeline, dictionaries) on
   SD rather than in RAM;
-- verify the actual memory budget on the target Unleashed version before
+- verify the actual memory budget on the current base release before
   designing new system services (Profiles, Global Search, Capture Timeline
   — see `UX_DESIGN.md`), rather than treating the numbers in this document
   as an exact budget.
 
-## Measured, not estimated (Stage 0, September 2026)
+## Measured, not estimated (September 2026)
 
-A stock build of the merged Unleashed base (`firmware/`, default `f7-firmware-D`
-target, no R0N1N changes yet) reports:
+Default `f7-firmware-D` (debug) target, built from `firmware/`:
 
-| Section | Size |
-|---|---|
-| `.text` (code) | 727,180 B (710.1 KB) |
-| `.rodata` (constants) | 176,732 B (172.6 KB) |
-| `.data` (initialized) | 700 B |
-| `.bss` (RAM, uninitialized) | 7,548 B (7.4 KB) |
-| `.free_flash` | 143,624 B (140.3 KB) |
+| Section | Stock official 1.4.3 | R0N1N (Stage 1) |
+|---|---|---|
+| `.text` (code) | 627,256 B (612.6 KB) | 628,496 B (613.8 KB) |
+| `.rodata` (constants) | 168,772 B (164.8 KB) | 168,884 B (164.9 KB) |
+| `.data` (initialized) | 680 B | 680 B |
+| `.bss` (RAM, uninitialized) | 4,748 B (4.6 KB) | 4,748 B (4.6 KB) |
+| `.free_flash` | 251,532 B (245.6 KB) | 250,180 B (244.3 KB) |
 
-Flash used by the firmware image (`.text` + `.rodata` + `.data`) is
-~883.4 KB, leaving ~140.3 KB free in the firmware partition — noticeably
-tighter than the ~300 KB the earlier community estimate implied, but still
-enough headroom to budget a Cyrillic font and the R0N1N-layer services
-against, as long as they're kept frugal (see `ARCHITECTURE.md`). This
-number will shift as Unleashed itself is updated (`git subtree pull`) and
-should be re-measured before locking in a flash budget for any specific
-R0N1N feature.
+Stage 1 costs ~1.3 KB of flash and no static RAM. The v2 interface with the
+Stage 2 screens (Cyrillic font, icons, all R0N1N scenes) brings the debug
+build to `.text` 642,592 B / 224 KB free (~22 KB over stock), `.bss` +144 B;
+the release build (`COMPACT=1 DEBUG=0`) leaves ~254 KB free. The desktop
+thread's stack went from 2 to 3 KB because the shell scenes scan the SD card
+on it. That is plenty of headroom to
+budget a Cyrillic font and the R0N1N-layer services against, as long as
+they're kept frugal (see `ARCHITECTURE.md`). These numbers will shift with
+each upstream release (`git subtree pull`) and should be re-measured
+before locking in a flash budget for any specific R0N1N feature.
 
 ## Open questions (still need confirmation)
 
@@ -145,7 +146,7 @@ R0N1N feature.
   static link-time report; actual free RAM needs the firmware's own
   `free`/`top` CLI commands on real hardware or in the debug build, not
   inferred from the static numbers above.
-- Compatibility of new R0N1N services with Unleashed's current
+- Compatibility of new R0N1N services with the official
   `api_symbols.csv` — see `ECOSYSTEM.md`.
 - ~~Cyrillic font feasibility~~ — **resolved, cheap.** See below.
 
@@ -160,7 +161,7 @@ specific u8g2 fonts:
 
 | `Font` enum | Current (Latin) | Cyrillic sibling in the bundle | Measured/estimated cost |
 |---|---|---|---|
-| `FontSecondary` | `u8g2_font_haxrcorp4089_tr` | `u8g2_font_haxrcorp4089_t_cyrillic` (exact same face) | **+1,712 B, build-verified** (see below) |
+| `FontSecondary` | `u8g2_font_haxrcorp4089_tr` | `u8g2_font_haxrcorp4089_t_cyrillic` (exact same face) | **+1,720 B, build-verified** (see below) |
 | `FontPrimary` | `u8g2_font_helvB08_tr` (bold) | no exact match; `u8g2_font_6x13B_t_cyrillic` is a bold alternative in the bundle | not measured — different metrics, needs a Stage 2 visual pick, but same order of magnitude (a few KB) |
 | `FontBigNumbers` | `u8g2_font_profont22_tn` | n/a | none needed — digits only |
 | `FontBatteryPercent` | `u8g2_font_5x7_tr` | n/a | none needed — digits/% only |
@@ -168,15 +169,15 @@ specific u8g2 fonts:
 
 The `FontSecondary` number is real, not estimated: swapping it to
 `u8g2_font_haxrcorp4089_t_cyrillic` in `canvas.c` and running a full
-`./fbt` build dropped `.free_flash` from 143,632 B to 141,920 B — a
-1,712 B cost (higher than the two fonts' raw declared-size difference of
+`./fbt` build on the 1.4.3 base dropped `.free_flash` from 249,980 B to
+248,260 B — a 1,720 B cost (higher than the two fonts' raw declared-size difference of
 780 B because the old font stayed linked in for an unrelated height-adjust
 comparison elsewhere in the same file; a clean swap would cost less). That
 change was reverted after measuring it — actually wiring locale-aware font
 selection is Stage 2 work (the localization service in `ARCHITECTURE.md`),
 not Stage 0.
 
-**Conclusion:** against a ~140 KB free-flash budget, a few KB for Cyrillic
+**Conclusion:** against a ~245 KB free-flash budget, a few KB for Cyrillic
 glyph tables is noise. This was the one open item blocking "Localization
 as a differentiator" in `VISION.md` from being a confident claim rather
 than a hope — it no longer is.

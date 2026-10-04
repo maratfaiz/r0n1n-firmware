@@ -3,12 +3,28 @@
 #include "assets_icons.h"
 #include "subghz/types.h"
 #include <furi.h>
+#include <furi_hal.h>
+#include <input/input.h>
+#include <gui/elements.h>
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <flipper_format/flipper_format.h>
+
 #include <flipper_format/flipper_format_i.h>
+#include <lib/toolbox/stream/stream.h>
+#include <lib/subghz/protocols/raw.h>
 
 #define TAG "SubGhz"
+
+void subghz_set_default_preset(SubGhz* subghz) {
+    furi_assert(subghz);
+    subghz_txrx_set_preset(
+        subghz->txrx,
+        "AM650",
+        subghz_setting_get_default_frequency(subghz_txrx_get_setting(subghz->txrx)),
+        NULL,
+        0);
+}
 
 void subghz_blink_start(SubGhz* subghz) {
     furi_assert(subghz);
@@ -25,10 +41,10 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
     switch(subghz_txrx_tx_start(subghz->txrx, flipper_format)) {
     case SubGhzTxRxStartTxStateErrorParserOthers:
         dialog_message_show_storage_error(
-            subghz->dialogs, "Error in protocol\nparameters\ndescription");
+            subghz->dialogs, "Ошибка в описании\nпараметров\nпротокола");
         break;
     case SubGhzTxRxStartTxStateErrorOnlyRx:
-        subghz_dialog_message_freq_error(subghz, true);
+        subghz_dialog_message_show_only_rx(subghz);
         break;
 
     default:
@@ -38,19 +54,19 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
     return false;
 }
 
-void subghz_dialog_message_freq_error(SubGhz* subghz, bool only_rx) {
+void subghz_dialog_message_show_only_rx(SubGhz* subghz) {
     DialogsApp* dialogs = subghz->dialogs;
     DialogMessage* message = dialog_message_alloc();
-    const char* header_text = "Frequency not supported";
-    const char* message_text = "Frequency\nis outside of\nsupported range.";
 
-    if(only_rx) {
-        header_text = "Transmission is blocked";
-        message_text = "Frequency\nis outside of\ndefault range.\nCheck docs.";
+    const char* header_text = "Передача запрещена!";
+    const char* message_text = "Передача на этой\nчастоте запрещена\nв вашем регионе";
+    if(!furi_hal_region_is_provisioned()) {
+        header_text = "Нужно обновление";
+        message_text = "Обновите прошивку,\nчтобы использовать\nэту функцию";
     }
 
-    dialog_message_set_header(message, header_text, 63, 3, AlignCenter, AlignTop);
-    dialog_message_set_text(message, message_text, 0, 17, AlignLeft, AlignTop);
+    dialog_message_set_header(message, header_text, 63, 0, AlignCenter, AlignTop);
+    dialog_message_set_text(message, message_text, 1, 13, AlignLeft, AlignTop);
 
     dialog_message_set_icon(message, &I_WarningDolphinFlip_45x42, 83, 22);
 
@@ -97,17 +113,8 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
             break;
         }
 
-        if(!subghz_txrx_radio_device_is_frequency_valid(subghz->txrx, temp_data32)) {
-            FURI_LOG_E(TAG, "Frequency not supported on chosen radio module");
-            load_key_state = SubGhzLoadKeyStateUnsuportedFreq;
-            break;
-        }
-
-        // TODO: use different frequency allowed lists for differnet modules (non cc1101)
-        if(!furi_hal_subghz_is_tx_allowed(temp_data32)) {
-            FURI_LOG_E(TAG, "This frequency can only be used for RX");
-
-            load_key_state = SubGhzLoadKeyStateOnlyRx;
+        if(!subghz_txrx_radio_device_is_frequecy_valid(subghz->txrx, temp_data32)) {
+            FURI_LOG_E(TAG, "Frequency not supported");
             break;
         }
 
@@ -137,19 +144,12 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
         }
         size_t preset_index =
             subghz_setting_get_inx_preset_by_name(setting, furi_string_get_cstr(temp_str));
-
-        //Edit TX power, if necessary.
-        uint8_t* preset_data = subghz_setting_get_preset_data(setting, preset_index);
-        size_t preset_data_size = subghz_setting_get_preset_data_size(setting, preset_index);
-        subghz_txrx_set_tx_power(preset_data, preset_data_size, subghz->tx_power);
-
-        //Set the Updated Preset.
         subghz_txrx_set_preset(
             subghz->txrx,
             furi_string_get_cstr(temp_str),
             temp_data32,
-            preset_data,
-            preset_data_size);
+            subghz_setting_get_preset_data(setting, preset_index),
+            subghz_setting_get_preset_data_size(setting, preset_index));
 
         //Load protocol
         if(!flipper_format_read_string(fff_data_file, "Protocol", temp_str)) {
@@ -199,19 +199,7 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
     case SubGhzLoadKeyStateProtocolDescriptionErr:
         if(show_dialog) {
             dialog_message_show_storage_error(
-                subghz->dialogs, "Error in protocol\nparameters\ndescription");
-        }
-        return false;
-
-    case SubGhzLoadKeyStateUnsuportedFreq:
-        if(show_dialog) {
-            subghz_dialog_message_freq_error(subghz, false);
-        }
-        return false;
-
-    case SubGhzLoadKeyStateOnlyRx:
-        if(show_dialog) {
-            subghz_dialog_message_freq_error(subghz, true);
+                subghz->dialogs, "Ошибка в описании\nпараметров\nпротокола");
         }
         return false;
 
@@ -288,7 +276,7 @@ bool subghz_save_protocol_to_file(
     do {
         //removing additional fields
         flipper_format_delete_key(flipper_format, "Repeat");
-        //flipper_format_delete_key(flipper_format, "Manufacture");
+        flipper_format_delete_key(flipper_format, "Manufacture");
 
         // Create subghz folder directory if necessary
         if(!storage_simply_mkdir(storage, furi_string_get_cstr(file_dir))) {
@@ -299,7 +287,6 @@ bool subghz_save_protocol_to_file(
         if(!storage_simply_remove(storage, dev_file_name)) {
             break;
         }
-
         stream_seek(flipper_format_stream, 0, StreamOffsetFromStart);
         stream_save_to_file(flipper_format_stream, storage, dev_file_name, FSOM_CREATE_ALWAYS);
 
@@ -317,32 +304,12 @@ bool subghz_save_protocol_to_file(
 void subghz_save_to_file(void* context) {
     furi_assert(context);
     SubGhz* subghz = context;
-
-    if(!subghz_path_is_file(subghz->file_path)) {
-        return;
+    if(subghz_path_is_file(subghz->file_path)) {
+        subghz_save_protocol_to_file(
+            subghz,
+            subghz_txrx_get_fff_data(subghz->txrx),
+            furi_string_get_cstr(subghz->file_path));
     }
-
-    FlipperFormat* fff_data = subghz_txrx_get_fff_data(subghz->txrx);
-
-    //Guard against corrupting RAW files
-    //This callback runs after transmitting a dynamic protocol to persist the
-    //updated rolling counter back into its source file. But file_path and
-    //fff_data can be stale relative to what was actually transmitted: e.g.
-    //sending a received signal from the Info screen leaves file_path pointing
-    //at a previously opened RAW file while fff_data still holds only the RAW
-    //header (Protocol/File_name/Radio_device_name). Writing that buffer would
-    //delete the RAW_Data and destroy the file. RAW samples are streamed from
-    //disk and are never persisted through this path, so never save RAW here.
-    FuriString* protocol = furi_string_alloc();
-    bool is_raw = flipper_format_rewind(fff_data) &&
-                  flipper_format_read_string(fff_data, "Protocol", protocol) &&
-                  furi_string_equal(protocol, "RAW");
-    furi_string_free(protocol);
-    if(is_raw) {
-        return;
-    }
-
-    subghz_save_protocol_to_file(subghz, fff_data, furi_string_get_cstr(subghz->file_path));
 }
 
 bool subghz_load_protocol_from_file(SubGhz* subghz) {

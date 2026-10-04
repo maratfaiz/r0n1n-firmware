@@ -56,11 +56,6 @@ Iso14443_4aError iso14443_4a_poller_send_block(
     const BitBuffer* tx_buffer,
     BitBuffer* rx_buffer);
 
-Iso14443_4aError iso14443_4a_poller_send_block_pwt_ext(
-    Iso14443_4aPoller* instance,
-    const BitBuffer* tx_buffer,
-    BitBuffer* rx_buffer);
-
 /**
  * @brief Transmit and receive Iso14443_4a chained block in poller mode. Also it
  * automatically modifies PCB packet byte with appropriate bits then resets them back 

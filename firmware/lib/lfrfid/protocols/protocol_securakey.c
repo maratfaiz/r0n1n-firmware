@@ -200,7 +200,7 @@ void protocol_securakey_render_data(ProtocolSecurakey* protocol, FuriString* res
         protocol->bit_format = 0;
         furi_string_printf(
             result,
-            "RKKTH Plaintext format\nCard number: %llu",
+            "RKKTH открытый формат\nНомер карты: %llu",
             bit_lib_get_bits_64(protocol->data, 0, 48));
     } else {
         if(bit_lib_get_bits(protocol->data, 0, 8) == 0) {
@@ -210,7 +210,7 @@ void protocol_securakey_render_data(ProtocolSecurakey* protocol, FuriString* res
         }
         furi_string_printf(
             result,
-            "RKKT %u-bit format\nFacility code: %u\nCard number: %u",
+            "RKKT, %u бит\nКод объекта: %u\nНомер карты: %u",
             protocol->bit_format,
             bit_lib_get_bits_16(protocol->data, 0, 16),
             bit_lib_get_bits_16(protocol->data, 16, 16));
@@ -328,20 +328,6 @@ bool protocol_securakey_write_data(ProtocolSecurakey* protocol, void* data) {
             request->t5577.block[2] = bit_lib_get_bits_32(protocol->RKKTH_encoded_data, 32, 32);
             request->t5577.blocks_to_write = 3;
             result = true;
-        } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-            request->em4305.word[4] =
-                (EM4x05_MODULATION_MANCHESTER | EM4x05_SET_BITRATE(40) | // requires 330pF card
-                 (6 << EM4x05_MAXBLOCK_SHIFT));
-            uint32_t encoded_data_reversed[2] = {0};
-            for(uint8_t i = 0; i < 64; i++) {
-                encoded_data_reversed[i / 32] =
-                    (encoded_data_reversed[i / 32] << 1) |
-                    (bit_lib_get_bit(protocol->RKKTH_encoded_data, (63 - i)) & 1);
-            }
-            request->em4305.word[5] = encoded_data_reversed[1];
-            request->em4305.word[6] = encoded_data_reversed[0];
-            request->em4305.mask = 0x70;
-            result = true;
         }
     } else {
         if(request->write_type == LFRFIDWriteTypeT5577) {
@@ -353,21 +339,6 @@ bool protocol_securakey_write_data(ProtocolSecurakey* protocol, void* data) {
             request->t5577.block[2] = bit_lib_get_bits_32(protocol->RKKT_encoded_data, 32, 32);
             request->t5577.block[3] = bit_lib_get_bits_32(protocol->RKKT_encoded_data, 64, 32);
             request->t5577.blocks_to_write = 4;
-            result = true;
-        } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-            request->em4305.word[4] =
-                (EM4x05_MODULATION_MANCHESTER | EM4x05_SET_BITRATE(40) | // requires 330pF card
-                 (7 << EM4x05_MAXBLOCK_SHIFT));
-            uint32_t encoded_data_reversed[3] = {0};
-            for(uint8_t i = 0; i < 96; i++) {
-                encoded_data_reversed[i / 32] =
-                    (encoded_data_reversed[i / 32] << 1) |
-                    (bit_lib_get_bit(protocol->RKKT_encoded_data, (95 - i)) & 1);
-            }
-            request->em4305.word[5] = encoded_data_reversed[2];
-            request->em4305.word[6] = encoded_data_reversed[1];
-            request->em4305.word[7] = encoded_data_reversed[0];
-            request->em4305.mask = 0xF0;
             result = true;
         }
     }

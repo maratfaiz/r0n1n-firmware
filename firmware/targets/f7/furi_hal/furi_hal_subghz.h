@@ -12,7 +12,6 @@
 #include <stddef.h>
 #include <toolbox/level_duration.h>
 #include <furi_hal_gpio.h>
-// #include <furi_hal_spi_types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -165,24 +164,6 @@ bool furi_hal_subghz_is_frequency_valid(uint32_t value);
  */
 uint32_t furi_hal_subghz_set_frequency_and_path(uint32_t value);
 
-/** Сheck if transmission is allowed on this frequency with your current config
- *
- * @param      value  frequency in Hz
- *
- * @return     true if allowed
- */
-bool furi_hal_subghz_is_tx_allowed(uint32_t value);
-
-/** Get the current rolling protocols counter ++/-- value
- * @return    int32_t current value
- */
-int32_t furi_hal_subghz_get_rolling_counter_mult(void);
-
-/** Set the current rolling protocols counter ++/-- value
- * @param      mult int32_t = -1, -10, -50, 0, 1, 10, 50 
- */
-void furi_hal_subghz_set_rolling_counter_mult(int32_t mult);
-
 /** Set frequency
  *
  * @param      value  frequency in Hz
@@ -237,11 +218,6 @@ bool furi_hal_subghz_is_async_tx_complete(void);
 /** Stop async transmission and cleanup resources Resets GPIO, TIM2, and DMA1
  */
 void furi_hal_subghz_stop_async_tx(void);
-
-// External CC1101 Amplifier and LEDs (if present) control
-void furi_hal_subghz_set_ext_leds_and_amp(bool enabled);
-// Get state (enabled by default, can be disabled in radio setting with debug ON)
-bool furi_hal_subghz_get_ext_leds_and_amp(void);
 
 #ifdef __cplusplus
 }

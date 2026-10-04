@@ -1,9 +1,10 @@
 #include "nfc_supported_card_plugin.h"
-#include <flipper_application.h>
 
+#include <flipper_application/flipper_application.h>
+
+#include <nfc/nfc_device.h>
+#include <bit_lib/bit_lib.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
-
-#include <bit_lib.h>
 
 #define TAG "HID"
 
@@ -66,7 +67,7 @@ static bool hid_read(Nfc* nfc, NfcDevice* device) {
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        is_read = (error == MfClassicErrorNone);
+        is_read = true;
     } while(false);
 
     mf_classic_free(data);

@@ -20,33 +20,34 @@ void storage_settings_scene_sd_info_on_enter(void* context) {
 
     if(sd_status != FSE_OK) {
         dialog_ex_set_icon(dialog_ex, 83, 22, &I_WarningDolphinFlip_45x42);
-        dialog_ex_set_header(dialog_ex, "SD Card Not Mounted", 64, 3, AlignCenter, AlignTop);
+        dialog_ex_set_header(dialog_ex, "Нет SD-карты", 64, 3, AlignCenter, AlignTop);
         dialog_ex_set_text(
-            dialog_ex, "Try to reinsert\nor format SD\ncard.", 3, 19, AlignLeft, AlignTop);
-        dialog_ex_set_center_button_text(dialog_ex, "Ok");
+            dialog_ex, "Вставьте заново\nили отформатируйте\nкарту.", 3, 19, AlignLeft, AlignTop);
+        dialog_ex_set_center_button_text(dialog_ex, "OK");
     } else {
         furi_string_printf(
             app->text_string,
-            "Label: %s\nType: %s\n",
+            "Метка: %s\nТип: %s\n",
             sd_info.label,
             sd_api_get_fs_type_text(sd_info.fs_type));
 
         if(sd_info.kb_total < 1024) {
-            furi_string_cat_printf(app->text_string, "Total: %lu KiB\n", sd_info.kb_total);
+            furi_string_cat_printf(app->text_string, "Всего: %lu КиБ\n", sd_info.kb_total);
         } else if(sd_info.kb_total < 1024 * 1024) {
-            furi_string_cat_printf(app->text_string, "Total: %lu MiB\n", sd_info.kb_total / 1024);
+            furi_string_cat_printf(app->text_string, "Всего: %lu МиБ\n", sd_info.kb_total / 1024);
         } else {
             furi_string_cat_printf(
-                app->text_string, "Total: %lu GiB\n", sd_info.kb_total / (1024 * 1024));
+                app->text_string, "Всего: %lu ГиБ\n", sd_info.kb_total / (1024 * 1024));
         }
 
         if(sd_info.kb_free < 1024) {
-            furi_string_cat_printf(app->text_string, "Free: %lu KiB\n", sd_info.kb_free);
+            furi_string_cat_printf(app->text_string, "Свободно: %lu КиБ\n", sd_info.kb_free);
         } else if(sd_info.kb_free < 1024 * 1024) {
-            furi_string_cat_printf(app->text_string, "Free: %lu MiB\n", sd_info.kb_free / 1024);
+            furi_string_cat_printf(
+                app->text_string, "Свободно: %lu МиБ\n", sd_info.kb_free / 1024);
         } else {
             furi_string_cat_printf(
-                app->text_string, "Free: %lu GiB\n", sd_info.kb_free / (1024 * 1024));
+                app->text_string, "Свободно: %lu ГиБ\n", sd_info.kb_free / (1024 * 1024));
         }
 
         furi_string_cat_printf(
@@ -78,13 +79,7 @@ bool storage_settings_scene_sd_info_on_event(void* context, SceneManagerEvent ev
         switch(event.event) {
         case DialogExResultLeft:
         case DialogExResultCenter:
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_previous_scene(app->scene_manager);
-            }
+            consumed = scene_manager_previous_scene(app->scene_manager);
             break;
         case DialogExResultRight:
             scene_manager_next_scene(app->scene_manager, StorageSettingsUnmounted);

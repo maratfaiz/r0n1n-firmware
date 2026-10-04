@@ -7,9 +7,6 @@ env.Append(
     LINT_SOURCES=[
         Dir("."),
     ],
-    SDK_HEADERS=[
-        File("u8g2_glue.h"),
-    ],
 )
 
 

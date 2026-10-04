@@ -9,28 +9,22 @@ void ibutton_scene_delete_confirm_on_enter(void* context) {
     FuriString* tmp = furi_string_alloc();
     FuriString* uid = furi_string_alloc();
 
-    widget_add_button_element(widget, GuiButtonTypeLeft, "Back", ibutton_widget_callback, context);
     widget_add_button_element(
-        widget, GuiButtonTypeRight, "Delete", ibutton_widget_callback, context);
+        widget, GuiButtonTypeLeft, "Назад", ibutton_widget_callback, context);
+    widget_add_button_element(
+        widget, GuiButtonTypeRight, "Удалить", ibutton_widget_callback, context);
 
-    furi_string_printf(tmp, "\e#Delete %s?\e#\n", ibutton->key_name);
+    furi_string_printf(tmp, "\e#Удалить %s?\e#\n", ibutton->key_name);
 
     ibutton_protocols_render_uid(ibutton->protocols, key, uid);
 
+    furi_string_cat_printf(
+        uid,
+        "\n%s %s",
+        ibutton_protocols_get_manufacturer(ibutton->protocols, ibutton_key_get_protocol_id(key)),
+        ibutton_protocols_get_name(ibutton->protocols, ibutton_key_get_protocol_id(key)));
+
     furi_string_cat(tmp, uid);
-
-    furi_string_push_back(tmp, '\n');
-
-    const char* protocol =
-        ibutton_protocols_get_name(ibutton->protocols, ibutton_key_get_protocol_id(key));
-    const char* manufacturer =
-        ibutton_protocols_get_manufacturer(ibutton->protocols, ibutton_key_get_protocol_id(key));
-
-    if(strcasecmp(protocol, manufacturer) != 0 && strcasecmp(manufacturer, "N/A") != 0) {
-        furi_string_cat_printf(tmp, "%s ", manufacturer);
-    }
-
-    furi_string_cat(tmp, protocol);
 
     widget_add_text_box_element(
         widget, 0, 0, 128, 64, AlignCenter, AlignTop, furi_string_get_cstr(tmp), false);
@@ -54,7 +48,7 @@ bool ibutton_scene_delete_confirm_on_event(void* context, SceneManagerEvent even
             if(ibutton_delete_key(ibutton)) {
                 scene_manager_next_scene(scene_manager, iButtonSceneDeleteSuccess);
             } else {
-                dialog_message_show_storage_error(ibutton->dialogs, "Cannot delete\nkey file");
+                dialog_message_show_storage_error(ibutton->dialogs, "Не удалось\nудалить ключ");
                 scene_manager_previous_scene(scene_manager);
             }
         } else if(event.event == GuiButtonTypeLeft) {

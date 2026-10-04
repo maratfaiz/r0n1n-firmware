@@ -18,7 +18,7 @@ SceneManager* scene_manager_alloc(const SceneManagerHandlers* app_scene_handlers
 void scene_manager_free(SceneManager* scene_manager) {
     furi_check(scene_manager);
 
-    // Clear SceneManager array
+    // Clear ScaneManager array
     SceneManagerIdStack_clear(scene_manager->scene_id_stack);
     // Free SceneManager structure
     free(scene_manager);

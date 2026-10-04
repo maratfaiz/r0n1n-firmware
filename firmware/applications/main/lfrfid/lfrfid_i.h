@@ -15,9 +15,7 @@
 #include <gui/modules/popup.h>
 #include <gui/modules/text_input.h>
 #include <gui/modules/byte_input.h>
-#include <gui/modules/number_input.h>
 #include <gui/modules/widget.h>
-#include <gui/modules/variable_item_list.h>
 
 #include <lfrfid/views/lfrfid_view_read.h>
 
@@ -31,13 +29,10 @@
 #include <toolbox/protocols/protocol_dict.h>
 #include <toolbox/path.h>
 #include <lfrfid/lfrfid_dict_file.h>
-#include <lfrfid/lfrfid_settings.h>
-#include <lfrfid/lfrfid_write_targets.h>
 #include <lfrfid/protocols/lfrfid_protocols.h>
 #include <lfrfid/lfrfid_worker.h>
 
 #include <lfrfid/scenes/lfrfid_scene.h>
-#include <lfrfid/lfrfid_manual_format.h>
 
 #define LFRFID_KEY_NAME_SIZE   22
 #define LFRFID_TEXT_STORE_SIZE 40
@@ -64,13 +59,10 @@ enum LfRfidCustomEvent {
     LfRfidEventReadDone,
     LfRfidEventReadOverrun,
     LfRfidEventReadError,
-    LfRfidEventWipeProgress,
     LfRfidEventWriteOK,
     LfRfidEventWriteProtocolCannotBeWritten,
-    LfRfidEventWriteNoEnabledTarget,
     LfRfidEventWriteFobCannotBeWritten,
     LfRfidEventWriteTooLongToWrite,
-    LfRfidEventWriteProgress,
     LfRfidEventRpcLoadFile,
     LfRfidEventRpcSessionClose,
 };
@@ -105,12 +97,6 @@ struct LfRfid {
     uint8_t* old_key_data;
     uint8_t* new_key_data;
 
-    uint32_t manual_format; // Add Manually entry, see lfrfid_manual_format.h
-    uint64_t field_values[LFRFID_MANUAL_FORMAT_FIELDS_MAX]; // its fields entered so far
-    size_t field_index; // the field being entered
-
-    uint8_t password[4];
-
     RpcAppSystem* rpc_ctx;
     LfRfidRpcState rpc_state;
 
@@ -120,8 +106,6 @@ struct LfRfid {
     Popup* popup;
     TextInput* text_input;
     ByteInput* byte_input;
-    NumberInput* number_input;
-    VariableItemList* variable_item_list; // allocated on first use, see the settings scene
 
     // Custom views
     LfRfidReadView* read_view;
@@ -134,8 +118,6 @@ typedef enum {
     LfRfidViewWidget,
     LfRfidViewTextInput,
     LfRfidViewByteInput,
-    LfRfidViewNumberInput,
-    LfRfidViewVariableItemList,
     LfRfidViewRead,
 } LfRfidView;
 
@@ -144,18 +126,13 @@ typedef enum {
     LfRfidMenuIndexSaved,
     LfRfidMenuIndexAddManually,
     LfRfidMenuIndexExtraActions,
-    LfRfidMenuIndexSettings,
 } LfRfidMenuIndex;
 
 bool lfrfid_save_key(LfRfid* app);
 
 bool lfrfid_load_key_from_file_select(LfRfid* app);
 
-bool lfrfid_load_raw_key_from_file_select(LfRfid* app);
-
 bool lfrfid_delete_key(LfRfid* app);
-
-bool lfrfid_delete_key_file(LfRfid* app, const FuriString* path);
 
 bool lfrfid_load_key_data(LfRfid* app, FuriString* path, bool show_dialog);
 
@@ -172,5 +149,3 @@ void lfrfid_popup_timeout_callback(void* context);
 void lfrfid_widget_callback(GuiButtonType result, InputType type, void* context);
 
 void lfrfid_text_input_callback(void* context);
-
-const uint32_t* lfrfid_get_t5577_default_passwords(uint8_t* len);

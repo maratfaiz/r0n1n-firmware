@@ -13,11 +13,11 @@ void nfc_scene_select_protocol_on_enter(void* context) {
     FuriString* temp_str = furi_string_alloc();
     const char* prefix;
     if(scene_manager_has_previous_scene(instance->scene_manager, NfcSceneExtraActions)) {
-        prefix = "Read";
+        prefix = "Чтение";
         nfc_detected_protocols_fill_all_protocols(instance->detected_protocols);
     } else {
-        prefix = "Read as";
-        submenu_set_header(submenu, "Multi-protocol card");
+        prefix = "Читать как";
+        submenu_set_header(submenu, "Мультипротокольная карта");
     }
 
     for(uint32_t i = 0; i < nfc_detected_protocols_get_num(instance->detected_protocols); i++) {

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <power/power_service/power_settings.h>
+
 #include <core/pubsub.h>
 
 #ifdef __cplusplus
@@ -96,18 +96,6 @@ bool power_is_battery_healthy(Power* power);
  * @param enable    true - enable, false - disable
  */
 void power_enable_low_battery_level_notification(Power* power, bool enable);
-
-/** Trigger UI update for changing battery layout
- *
- * @param power     Power instance
- */
-void power_trigger_ui_update(Power* power);
-
-// get settings from service to app
-void power_api_get_settings(Power* instance, PowerSettings* settings);
-
-// set settings from app to service
-void power_api_set_settings(Power* instance, const PowerSettings* settings);
 
 /** Enable or disable OTG
  *

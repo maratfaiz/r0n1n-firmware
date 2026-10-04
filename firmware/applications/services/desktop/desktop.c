@@ -7,12 +7,13 @@
 #include <locale/locale.h>
 #include <storage/storage.h>
 
+#include <applications.h>
 #include <assets_icons.h>
 
 #include "scenes/desktop_scene.h"
+#include "scenes/desktop_scene_r0n1n.h"
 #include "scenes/desktop_scene_locked.h"
-
-#include "furi_hal_power.h"
+#include "helpers/r0n1n_boot.h"
 
 #define TAG "Desktop"
 
@@ -20,6 +21,7 @@ static void desktop_auto_lock_arm(Desktop*);
 static void desktop_auto_lock_inhibit(Desktop*);
 static void desktop_start_auto_lock_timer(Desktop*);
 static void desktop_apply_settings(Desktop*);
+static void desktop_dashboard_update(Desktop*);
 
 static void desktop_loader_callback(const void* message, void* context) {
     furi_assert(context);
@@ -30,13 +32,17 @@ static void desktop_loader_callback(const void* message, void* context) {
         // R0N1N Recent apps: stash the name here (Loader's thread) before the
         // custom event is even enqueued, so the handler on the ViewDispatcher's
         // thread (DesktopGlobalBeforeAppStarted below) sees it once dequeued.
-        if(event->name) {
-            strlcpy(desktop->pending_app_name, event->name, sizeof(desktop->pending_app_name));
-        } else {
+        // A name too long to store whole is dropped rather than truncated: a
+        // truncated .fap path would sit in Recent and fail to relaunch.
+        if(!event->name ||
+           strlcpy(desktop->pending_app_name, event->name, sizeof(desktop->pending_app_name)) >=
+               sizeof(desktop->pending_app_name)) {
             desktop->pending_app_name[0] = '\0';
         }
         view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalBeforeAppStarted);
         furi_check(furi_semaphore_acquire(desktop->animation_semaphore, 3000) == FuriStatusOk);
+    } else if(event->type == LoaderEventTypeApplicationStopped) {
+        view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalAppStopped);
     } else if(event->type == LoaderEventTypeNoMoreAppsInQueue) {
         view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalAfterAppFinished);
     }
@@ -113,11 +119,7 @@ static void desktop_clock_draw_callback(Canvas* canvas, void* context) {
     }
 
     char buffer[20];
-    if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
-        snprintf(buffer, sizeof(buffer), "D %02u:%02u", hour, desktop->clock.minute);
-    } else {
-        snprintf(buffer, sizeof(buffer), "%02u:%02u", hour, desktop->clock.minute);
-    }
+    snprintf(buffer, sizeof(buffer), "%02u:%02u", hour, desktop->clock.minute);
 
     view_port_set_width(
         desktop->clock_viewport,
@@ -132,24 +134,29 @@ static void desktop_stealth_mode_icon_draw_callback(Canvas* canvas, void* contex
     canvas_draw_icon(canvas, 0, 0, &I_Muted_8x8);
 }
 
-// R0N1N Recent apps (docs/UX_DESIGN.md): most-recent first, capped ring
-// buffer, deduplicating an immediate repeat (relaunching the same app twice
-// in a row shouldn't produce two entries).
+// R0N1N Recent apps (docs/UX_DESIGN.md): most-recent first, capped at
+// DESKTOP_RECENT_APPS_COUNT. Relaunching an app already in the list moves it
+// to the front instead of adding a duplicate; otherwise the oldest entry is
+// dropped once the list is full.
 static void desktop_recent_apps_push(Desktop* desktop, const char* name) {
-    if(!name || name[0] == '\0') return;
-    if(desktop->recent_apps_count > 0 && strncmp(desktop->recent_apps[0], name, DESKTOP_RECENT_APP_NAME_LEN) == 0) {
-        return;
-    }
+    if(name[0] == '\0') return;
 
-    uint8_t count = desktop->recent_apps_count;
-    if(count < DESKTOP_RECENT_APPS_COUNT) {
-        count++;
+    uint8_t i = 0;
+    while(i < desktop->recent_apps_count && strcmp(desktop->recent_apps[i], name) != 0) {
+        i++;
     }
-    for(uint8_t i = count - 1; i > 0; i--) {
+    if(i == desktop->recent_apps_count) {
+        if(desktop->recent_apps_count < DESKTOP_RECENT_APPS_COUNT) {
+            desktop->recent_apps_count++;
+        }
+        i = desktop->recent_apps_count - 1;
+    }
+    for(; i > 0; i--) {
         strlcpy(desktop->recent_apps[i], desktop->recent_apps[i - 1], DESKTOP_RECENT_APP_NAME_LEN);
+        desktop->recent_apps_time[i] = desktop->recent_apps_time[i - 1];
     }
     strlcpy(desktop->recent_apps[0], name, DESKTOP_RECENT_APP_NAME_LEN);
-    desktop->recent_apps_count = count;
+    desktop->recent_apps_time[0] = furi_hal_rtc_get_timestamp();
 }
 
 static bool desktop_custom_event_callback(void* context, uint32_t event) {
@@ -162,9 +169,11 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         }
 
         desktop_auto_lock_inhibit(desktop);
-
         desktop->app_running = true;
-        desktop_recent_apps_push(desktop, desktop->pending_app_name);
+        strlcpy(
+            desktop->launched_app_name,
+            desktop->pending_app_name,
+            sizeof(desktop->launched_app_name));
 
         furi_semaphore_release(desktop->animation_semaphore);
 
@@ -172,25 +181,37 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         animation_manager_load_and_continue_animation(desktop->animation_manager);
         desktop_auto_lock_arm(desktop);
         desktop->app_running = false;
+        // The dashboard timer skips ticks while an app runs (see its
+        // callback); repaint now so Home doesn't show a stale clock for up
+        // to a second after returning.
+        if(furi_timer_is_running(desktop->dashboard_update_timer)) {
+            desktop_dashboard_update(desktop);
+        }
+
+    } else if(event == DesktopGlobalAppStopped) {
+        desktop_recent_apps_push(desktop, desktop->launched_app_name);
+        desktop->launched_app_name[0] = '\0';
 
     } else if(event == DesktopGlobalAutoLock) {
         if(!desktop->app_running && !desktop->locked) {
-            // Disable AutoLock if usb_inhibit_autolock option enabled and device have active USB session.
-            if((desktop->settings.usb_inhibit_auto_lock) && (furi_hal_usb_is_locked())) {
-                return (0);
-            }
-
             desktop_lock(desktop);
         }
+
     } else if(event == DesktopGlobalSaveSettings) {
         desktop_settings_save(&desktop->settings);
         desktop_apply_settings(desktop);
 
     } else if(event == DesktopGlobalReloadSettings) {
         desktop_settings_load(&desktop->settings);
+        r0n1n_settings_load(&desktop->r0n1n);
         desktop_apply_settings(desktop);
 
     } else {
+        // R0N1N: a short click when something is selected in the shell
+        const uint32_t kind = event & R0N1N_EVT_KIND;
+        if(kind == R0N1N_EVT_OK || kind == R0N1N_EVT_HOLD) {
+            desktop_r0n1n_feedback(desktop, R0n1nFeedbackClick);
+        }
         return scene_manager_handle_custom_event(desktop->scene_manager, event);
     }
 
@@ -236,10 +257,8 @@ static void desktop_stop_auto_lock_timer(Desktop* desktop) {
 
 static void desktop_auto_lock_arm(Desktop* desktop) {
     if(desktop->settings.auto_lock_delay_ms) {
-        if(!desktop->input_events_subscription) {
-            desktop->input_events_subscription = furi_pubsub_subscribe(
-                desktop->input_events_pubsub, desktop_input_event_callback, desktop);
-        }
+        desktop->input_events_subscription = furi_pubsub_subscribe(
+            desktop->input_events_pubsub, desktop_input_event_callback, desktop);
         desktop_start_auto_lock_timer(desktop);
     }
 }
@@ -268,13 +287,28 @@ static void desktop_clock_timer_callback(void* context) {
 // R0N1N Home dashboard (docs/UX_DESIGN.md): drives desktop_view_main's big
 // clock/date/profile display. Only ticks while desktop_scene_main is active
 // (started/stopped there), independent of the small status-bar clock above.
+static void desktop_dashboard_update(Desktop* desktop) {
+    DateTime datetime;
+    furi_hal_rtc_get_datetime(&datetime);
+    const uint8_t wp =
+        desktop->r0n1n.wallpaper < r0n1n_wallpapers_count ? desktop->r0n1n.wallpaper : 0;
+    desktop_main_update_dashboard(
+        desktop->main_view,
+        &datetime,
+        r0n1n_profiles[desktop->r0n1n.profile].name,
+        furi_hal_power_get_pct(),
+        r0n1n_wallpapers[wp].icon);
+}
+
 static void desktop_dashboard_update_timer_callback(void* context) {
     furi_assert(context);
     Desktop* desktop = context;
 
-    DateTime datetime;
-    furi_hal_rtc_get_datetime(&datetime);
-    desktop_main_update_dashboard(desktop->main_view, &datetime, DASHBOARD_DEFAULT_PROFILE_NAME);
+    // The Main scene stays current underneath a running app, so without this
+    // every tick would request a full GUI redraw for a screen nobody sees.
+    if(desktop->app_running) return;
+
+    desktop_dashboard_update(desktop);
 }
 
 static void desktop_apply_settings(Desktop* desktop) {
@@ -282,14 +316,20 @@ static void desktop_apply_settings(Desktop* desktop) {
 
     desktop_clock_reconfigure(desktop);
 
+    // R0N1N has no dummy ("game") mode: its Home is always the dashboard.
+    // Clear a flag saved by an earlier firmware so nobody gets stuck in it.
+    desktop->settings.dummy_mode = false;
+
     view_port_enabled_set(desktop->dummy_mode_icon_viewport, desktop->settings.dummy_mode);
+    desktop_main_set_simple_mode(desktop->main_view, desktop->r0n1n.simple_mode);
     desktop_main_set_dummy_mode_state(desktop->main_view, desktop->settings.dummy_mode);
     animation_manager_set_dummy_mode_state(
         desktop->animation_manager, desktop->settings.dummy_mode);
 
-    loader_set_menu_style(desktop->loader, desktop->settings.menu_style);
-
     if(!desktop->app_running && !desktop->locked) {
+        // Settings can now change while armed (Control Center's Auto-lock
+        // tile): disarm first so the delay is new and the subscription single.
+        desktop_auto_lock_inhibit(desktop);
         desktop_auto_lock_arm(desktop);
     }
 
@@ -305,15 +345,19 @@ static void desktop_init_settings(Desktop* desktop) {
     }
 
     desktop_settings_load(&desktop->settings);
+    r0n1n_settings_load(&desktop->r0n1n);
     desktop_apply_settings(desktop);
 }
 
 static Desktop* desktop_alloc(void) {
     Desktop* desktop = malloc(sizeof(Desktop));
+    // R0N1N defaults until the SD card (and /int on it) is ready.
+    r0n1n_settings_load(&desktop->r0n1n);
 
     desktop->animation_semaphore = furi_semaphore_alloc(1, 0);
     desktop->animation_manager = animation_manager_alloc();
     desktop->gui = furi_record_open(RECORD_GUI);
+    desktop->scene_thread = furi_thread_alloc();
     desktop->view_dispatcher = view_dispatcher_alloc();
     desktop->scene_manager = scene_manager_alloc(&desktop_scene_handlers, desktop);
 
@@ -329,15 +373,18 @@ static Desktop* desktop_alloc(void) {
         desktop->view_dispatcher, desktop_back_event_callback);
 
     desktop->lock_menu = desktop_lock_menu_alloc();
-    desktop->quick_settings = desktop_quick_settings_alloc();
     desktop->debug_view = desktop_debug_alloc();
     desktop->popup = popup_alloc();
     desktop->locked_view = desktop_view_locked_alloc();
     desktop->pin_input_view = desktop_view_pin_input_alloc();
     desktop->pin_timeout_view = desktop_view_pin_timeout_alloc();
     desktop->slideshow_view = desktop_view_slideshow_alloc();
-    desktop->favorites_submenu = submenu_alloc();
-    desktop->recent_submenu = submenu_alloc();
+    desktop->r0n1n_list = r0n1n_list_alloc();
+    desktop->r0n1n_grid = r0n1n_grid_alloc();
+    desktop->r0n1n_carousel = r0n1n_carousel_alloc();
+    desktop->simple_menu = desktop_simple_menu_alloc();
+    desktop->text_input = text_input_alloc();
+    desktop->dialog_ex = dialog_ex_alloc();
 
     desktop->main_view_stack = view_stack_alloc();
     desktop->main_view = desktop_main_alloc();
@@ -373,10 +420,6 @@ static Desktop* desktop_alloc(void) {
         DesktopViewIdLockMenu,
         desktop_lock_menu_get_view(desktop->lock_menu));
     view_dispatcher_add_view(
-        desktop->view_dispatcher,
-        DesktopViewIdQuickSettings,
-        desktop_quick_settings_get_view(desktop->quick_settings));
-    view_dispatcher_add_view(
         desktop->view_dispatcher, DesktopViewIdDebug, desktop_debug_get_view(desktop->debug_view));
     view_dispatcher_add_view(
         desktop->view_dispatcher, DesktopViewIdPopup, popup_get_view(desktop->popup));
@@ -394,10 +437,26 @@ static Desktop* desktop_alloc(void) {
         desktop_view_slideshow_get_view(desktop->slideshow_view));
     view_dispatcher_add_view(
         desktop->view_dispatcher,
-        DesktopViewIdFavorites,
-        submenu_get_view(desktop->favorites_submenu));
+        DesktopViewIdR0n1nList,
+        r0n1n_list_get_view(desktop->r0n1n_list));
     view_dispatcher_add_view(
-        desktop->view_dispatcher, DesktopViewIdRecent, submenu_get_view(desktop->recent_submenu));
+        desktop->view_dispatcher,
+        DesktopViewIdR0n1nGrid,
+        r0n1n_grid_get_view(desktop->r0n1n_grid));
+    view_dispatcher_add_view(
+        desktop->view_dispatcher,
+        DesktopViewIdR0n1nCarousel,
+        r0n1n_carousel_get_view(desktop->r0n1n_carousel));
+    view_dispatcher_add_view(
+        desktop->view_dispatcher,
+        DesktopViewIdSimpleMenu,
+        desktop_simple_menu_get_view(desktop->simple_menu));
+    view_dispatcher_add_view(
+        desktop->view_dispatcher,
+        DesktopViewIdTextInput,
+        text_input_get_view(desktop->text_input));
+    view_dispatcher_add_view(
+        desktop->view_dispatcher, DesktopViewIdDialog, dialog_ex_get_view(desktop->dialog_ex));
 
     // Lock icon
     desktop->lock_icon_viewport = view_port_alloc();
@@ -538,6 +597,35 @@ void desktop_set_stealth_mode_state(Desktop* desktop, bool enabled) {
     desktop->in_transition = false;
 }
 
+// Archive is not a Loader app: it runs on the desktop's own thread so it can
+// start other apps through the Loader itself. The stock firmware only reaches
+// it from Down-short on Home; R0N1N gives Down to Control Center, so Quick
+// Actions (desktop_scene_favorites.c) is where it's launched from instead.
+void desktop_run_archive(Desktop* desktop) {
+    furi_assert(desktop);
+#ifdef APP_ARCHIVE
+    const FlipperInternalApplication* flipper_app = &FLIPPER_ARCHIVE;
+
+    if(furi_thread_get_state(desktop->scene_thread) != FuriThreadStateStopped) {
+        FURI_LOG_E("Desktop", "Thread is already running");
+        return;
+    }
+
+    FuriHalRtcHeapTrackMode mode = furi_hal_rtc_get_heap_track_mode();
+    if(mode > FuriHalRtcHeapTrackModeNone) {
+        furi_thread_enable_heap_trace(desktop->scene_thread);
+    } else {
+        furi_thread_disable_heap_trace(desktop->scene_thread);
+    }
+
+    furi_thread_set_name(desktop->scene_thread, flipper_app->name);
+    furi_thread_set_stack_size(desktop->scene_thread, flipper_app->stack_size);
+    furi_thread_set_callback(desktop->scene_thread, flipper_app->app);
+
+    furi_thread_start(desktop->scene_thread);
+#endif
+}
+
 /*
  *  Public API
  */
@@ -631,6 +719,11 @@ int32_t desktop_srv(void* p) {
     // Special case: autostart application is already running
     if(desktop->app_running && animation_manager_is_animation_loaded(desktop->animation_manager)) {
         animation_manager_unload_and_stall_animation(desktop->animation_manager);
+    }
+
+    // R0N1N boot splash, unless an autostart application is already on screen
+    if(!desktop->app_running) {
+        r0n1n_boot_run(desktop->gui);
     }
 
     view_dispatcher_run(desktop->view_dispatcher);

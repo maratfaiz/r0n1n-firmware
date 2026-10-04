@@ -5,17 +5,11 @@ enum HidSubmenuIndex {
     HidSubmenuIndexKeynote,
     HidSubmenuIndexKeynoteVertical,
     HidSubmenuIndexKeyboard,
-    HidSubmenuIndexNumpad,
     HidSubmenuIndexMedia,
-    HidSubmenuIndexMusicMacOs,
-    HidSubmenuIndexMovie,
     HidSubmenuIndexTikTok,
     HidSubmenuIndexMouse,
     HidSubmenuIndexMouseClicker,
     HidSubmenuIndexMouseJiggler,
-    HidSubmenuIndexMouseJigglerStealth,
-    HidSubmenuIndexPushToTalk,
-    HidSubmenuIndexRename,
     HidSubmenuIndexRemovePairing,
 };
 
@@ -28,69 +22,35 @@ static void hid_scene_start_submenu_callback(void* context, uint32_t index) {
 void hid_scene_start_on_enter(void* context) {
     Hid* app = context;
     submenu_add_item(
-        app->submenu, "Keynote", HidSubmenuIndexKeynote, hid_scene_start_submenu_callback, app);
+        app->submenu, "Слайды", HidSubmenuIndexKeynote, hid_scene_start_submenu_callback, app);
     submenu_add_item(
         app->submenu,
-        "Keynote Vertical",
+        "Слайды (вертикально)",
         HidSubmenuIndexKeynoteVertical,
         hid_scene_start_submenu_callback,
         app);
     submenu_add_item(
-        app->submenu, "Keyboard", HidSubmenuIndexKeyboard, hid_scene_start_submenu_callback, app);
+        app->submenu, "Клавиат.", HidSubmenuIndexKeyboard, hid_scene_start_submenu_callback, app);
     submenu_add_item(
-        app->submenu, "Numpad", HidSubmenuIndexNumpad, hid_scene_start_submenu_callback, app);
+        app->submenu, "Медиа", HidSubmenuIndexMedia, hid_scene_start_submenu_callback, app);
     submenu_add_item(
-        app->submenu, "Media", HidSubmenuIndexMedia, hid_scene_start_submenu_callback, app);
+        app->submenu, "Мышь", HidSubmenuIndexMouse, hid_scene_start_submenu_callback, app);
+#ifdef HID_TRANSPORT_BLE
     submenu_add_item(
-        app->submenu,
-        "Apple Music macOS",
-        HidSubmenuIndexMusicMacOs,
-        hid_scene_start_submenu_callback,
-        app);
+        app->submenu, "Пульт TikTok", HidSubmenuIndexTikTok, hid_scene_start_submenu_callback, app);
+#endif
     submenu_add_item(
-        app->submenu, "Movie", HidSubmenuIndexMovie, hid_scene_start_submenu_callback, app);
-    submenu_add_item(
-        app->submenu, "Mouse", HidSubmenuIndexMouse, hid_scene_start_submenu_callback, app);
+        app->submenu, "Кликер", HidSubmenuIndexMouseClicker, hid_scene_start_submenu_callback, app);
     submenu_add_item(
         app->submenu,
-        "TikTok / YT Shorts",
-        HidSubmenuIndexTikTok,
-        hid_scene_start_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu,
-        "Mouse Clicker",
-        HidSubmenuIndexMouseClicker,
-        hid_scene_start_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu,
-        "Mouse Jiggler",
+        "Джиглер",
         HidSubmenuIndexMouseJiggler,
-        hid_scene_start_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu,
-        "Mouse Jiggler Stealth",
-        HidSubmenuIndexMouseJigglerStealth,
-        hid_scene_start_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu,
-        "PushToTalk",
-        HidSubmenuIndexPushToTalk,
         hid_scene_start_submenu_callback,
         app);
 #ifdef HID_TRANSPORT_BLE
     submenu_add_item(
         app->submenu,
-        "Bluetooth Remote Name",
-        HidSubmenuIndexRename,
-        hid_scene_start_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu,
-        "Bluetooth Unpairing",
+        "Забыть Bluetooth",
         HidSubmenuIndexRemovePairing,
         hid_scene_start_submenu_callback,
         app);
@@ -108,8 +68,6 @@ bool hid_scene_start_on_event(void* context, SceneManagerEvent event) {
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == HidSubmenuIndexRemovePairing) {
             scene_manager_next_scene(app->scene_manager, HidSceneUnpair);
-        } else if(event.event == HidSubmenuIndexRename) {
-            scene_manager_next_scene(app->scene_manager, HidSceneRename);
         } else {
             HidView view_id;
 
@@ -125,17 +83,8 @@ bool hid_scene_start_on_event(void* context, SceneManagerEvent event) {
             case HidSubmenuIndexKeyboard:
                 view_id = HidViewKeyboard;
                 break;
-            case HidSubmenuIndexNumpad:
-                view_id = HidViewNumpad;
-                break;
             case HidSubmenuIndexMedia:
                 view_id = HidViewMedia;
-                break;
-            case HidSubmenuIndexMusicMacOs:
-                view_id = HidViewMusicMacOs;
-                break;
-            case HidSubmenuIndexMovie:
-                view_id = HidViewMovie;
                 break;
             case HidSubmenuIndexTikTok:
                 view_id = BtHidViewTikTok;
@@ -148,12 +97,6 @@ bool hid_scene_start_on_event(void* context, SceneManagerEvent event) {
                 break;
             case HidSubmenuIndexMouseJiggler:
                 view_id = HidViewMouseJiggler;
-                break;
-            case HidSubmenuIndexMouseJigglerStealth:
-                view_id = HidViewMouseJigglerStealth;
-                break;
-            case HidSubmenuIndexPushToTalk:
-                view_id = HidViewPushToTalkMenu;
                 break;
             default:
                 furi_crash();

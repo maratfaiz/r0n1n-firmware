@@ -18,13 +18,13 @@ void storage_settings_scene_factory_reset_on_enter(void* context) {
     dialog_ex_set_context(dialog_ex, app);
     dialog_ex_set_result_callback(dialog_ex, storage_settings_scene_factory_reset_dialog_callback);
 
-    dialog_ex_set_left_button_text(dialog_ex, "Cancel");
-    dialog_ex_set_right_button_text(dialog_ex, "Erase");
+    dialog_ex_set_left_button_text(dialog_ex, "Отмена");
+    dialog_ex_set_right_button_text(dialog_ex, "Стереть");
 
-    dialog_ex_set_header(dialog_ex, "Confirm Factory Reset?", 64, 0, AlignCenter, AlignTop);
+    dialog_ex_set_header(dialog_ex, "Сбросить к заводским?", 64, 0, AlignCenter, AlignTop);
     dialog_ex_set_text(
         dialog_ex,
-        "Internal storage will be erased\ndata and settings will be lost!",
+        "Память будет стерта,\nданные и настройки\nудалятся!",
         64,
         14,
         AlignCenter,
@@ -44,20 +44,14 @@ bool storage_settings_scene_factory_reset_on_event(void* context, SceneManagerEv
         switch(event.event) {
         case DialogExResultLeft:
             scene_manager_set_scene_state(app->scene_manager, StorageSettingsFactoryReset, 0);
-            if(app->from_favorites) {
-                scene_manager_stop(app->scene_manager);
-                view_dispatcher_stop(app->view_dispatcher);
-                return true;
-            } else {
-                consumed = scene_manager_previous_scene(app->scene_manager);
-            }
+            consumed = scene_manager_previous_scene(app->scene_manager);
             break;
         case DialogExResultRight:
             counter++;
             if(counter < STORAGE_SETTINGS_SCENE_FACTORY_RESET_CONFIRM_COUNT) {
                 furi_string_printf(
                     app->text_string,
-                    "%ld presses left",
+                    "Осталось нажатий: %ld",
                     STORAGE_SETTINGS_SCENE_FACTORY_RESET_CONFIRM_COUNT - counter);
                 dialog_ex_set_text(
                     app->dialog_ex,

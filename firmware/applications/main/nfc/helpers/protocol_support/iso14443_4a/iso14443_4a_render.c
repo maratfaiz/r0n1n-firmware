@@ -19,87 +19,67 @@ void nfc_render_iso14443_4a_brief(const Iso14443_4aData* data, FuriString* str) 
 }
 
 void nfc_render_iso14443_4a_extra(const Iso14443_4aData* data, FuriString* str) {
-    uint32_t hist_bytes_count;
-    const uint8_t* hist_bytes = iso14443_4a_get_historical_bytes(data, &hist_bytes_count);
-
-    // Full raw ATS as received (TL T0 [TA1] [TB1] [TC1] + historical bytes), before the decoded
-    // fields below, so every screen using this renderer also exposes the exact ATS. T0 bits 4/5/6
-    // flag the presence of TA1/TB1/TC1.
-    const Iso14443_4aAtsData* ats = &data->ats_data;
-    if(ats->tl > 1) {
-        furi_string_cat_printf(str, "\n:::::::::::::::::::::[ATS]:::::::::::::::::::::\nRaw:");
-        furi_string_cat_printf(str, " %02X %02X", ats->tl, ats->t0);
-        if(ats->t0 & 0x10) furi_string_cat_printf(str, " %02X", ats->ta_1);
-        if(ats->t0 & 0x20) furi_string_cat_printf(str, " %02X", ats->tb_1);
-        if(ats->t0 & 0x40) furi_string_cat_printf(str, " %02X", ats->tc_1);
-        for(size_t i = 0; i < hist_bytes_count; ++i) {
-            furi_string_cat_printf(str, " %02X", hist_bytes[i]);
-        }
-    }
-
-    furi_string_cat_printf(str, "\n::::::::::::::::[Protocol info]:::::::::::::::\n");
+    furi_string_cat_printf(str, "\n:::::::::::::::[Протокол]:::::::::::::::\n");
 
     if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRateBoth106Kbit)) {
-        furi_string_cat(str, "Bit rate PICC <-> PCD:\n  106 kBit/s supported\n");
+        furi_string_cat(str, "Скорость PICC <-> PCD:\n  106 кбит/с поддерж.\n");
     } else {
-        furi_string_cat(str, "Bit rate PICC -> PCD:\n");
+        furi_string_cat(str, "Скорость PICC -> PCD:\n");
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePiccToPcd212Kbit)) {
-            furi_string_cat(str, "  212 kBit/s supported\n");
+            furi_string_cat(str, "  212 кбит/с поддерж.\n");
         }
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePiccToPcd424Kbit)) {
-            furi_string_cat(str, "  424 kBit/s supported\n");
+            furi_string_cat(str, "  424 кбит/с поддерж.\n");
         }
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePiccToPcd848Kbit)) {
-            furi_string_cat(str, "  848 kBit/s supported\n");
+            furi_string_cat(str, "  848 кбит/с поддерж.\n");
         }
 
-        furi_string_cat(str, "Bit rate PICC <- PCD:\n");
+        furi_string_cat(str, "Скорость PICC <- PCD:\n");
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePcdToPicc212Kbit)) {
-            furi_string_cat(str, "  212 kBit/s supported\n");
+            furi_string_cat(str, "  212 кбит/с поддерж.\n");
         }
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePcdToPicc424Kbit)) {
-            furi_string_cat(str, "  424 kBit/s supported\n");
+            furi_string_cat(str, "  424 кбит/с поддерж.\n");
         }
         if(iso14443_4a_supports_bit_rate(data, Iso14443_4aBitRatePcdToPicc848Kbit)) {
-            furi_string_cat(str, "  848 kBit/s supported\n");
+            furi_string_cat(str, "  848 кбит/с поддерж.\n");
         }
     }
 
-    furi_string_cat(str, "Max frame size: ");
+    furi_string_cat(str, "Макс. кадр: ");
 
     const uint16_t max_frame_size = iso14443_4a_get_frame_size_max(data);
     if(max_frame_size != 0) {
-        furi_string_cat_printf(str, "%u bytes\n", max_frame_size);
+        furi_string_cat_printf(str, "%u байт\n", max_frame_size);
     } else {
         furi_string_cat(str, "? (RFU)\n");
     }
 
     const uint32_t fwt_fc = iso14443_4a_get_fwt_fc_max(data);
     if(fwt_fc != 0) {
-        // fc -> us is fc * 25 / 339 (1/13.56 exactly), truncating to whole microseconds. fwi is
-        // capped at 14, so fc <= 4096 << 14 and the multiply fits uint32_t. Integer rather than
-        // double to keep the soft-float calls out of the render path.
-        const uint32_t fwt_us = fwt_fc * 25 / 339;
-        furi_string_cat_printf(
-            str, "Max waiting time: %lu.%06lu s\n", fwt_us / 1000000UL, fwt_us % 1000000UL);
+        furi_string_cat_printf(str, "Макс. ожидание: %4.2g с\n", (double)(fwt_fc / 13.56e6));
     }
 
     const char* nad_support_str =
-        iso14443_4a_supports_frame_option(data, Iso14443_4aFrameOptionNad) ? "" : "not ";
-    furi_string_cat_printf(str, "NAD: %ssupported\n", nad_support_str);
+        iso14443_4a_supports_frame_option(data, Iso14443_4aFrameOptionNad) ? "" : "не ";
+    furi_string_cat_printf(str, "NAD: %sподдерж.\n", nad_support_str);
 
     const char* cid_support_str =
-        iso14443_4a_supports_frame_option(data, Iso14443_4aFrameOptionCid) ? "" : "not ";
-    furi_string_cat_printf(str, "CID: %ssupported", cid_support_str);
+        iso14443_4a_supports_frame_option(data, Iso14443_4aFrameOptionCid) ? "" : "не ";
+    furi_string_cat_printf(str, "CID: %sподдерж.", cid_support_str);
+
+    uint32_t hist_bytes_count;
+    const uint8_t* hist_bytes = iso14443_4a_get_historical_bytes(data, &hist_bytes_count);
 
     if(hist_bytes_count > 0) {
-        furi_string_cat_printf(str, "\n:::::::::::::[Historical bytes]:::::::::::::\nRaw:");
+        furi_string_cat_printf(str, "\n:::::::::::::[Истор. байты]:::::::::::::\nRaw:");
 
         for(size_t i = 0; i < hist_bytes_count; ++i) {
             furi_string_cat_printf(str, " %02X", hist_bytes[i]);
         }
     }
 
-    furi_string_cat(str, "\n\e#ISO14443-3A data");
+    furi_string_cat(str, "\n\e#Данные ISO14443-3A");
     nfc_render_iso14443_3a_extra(iso14443_4a_get_base_data(data), str);
 }

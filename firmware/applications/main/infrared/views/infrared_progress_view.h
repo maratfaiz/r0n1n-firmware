@@ -20,7 +20,6 @@ typedef enum {
     InfraredProgressViewInputPreviousSignal,
     InfraredProgressViewInputNextSignal,
     InfraredProgressViewInputSendSingle,
-    InfraredProgressViewInputSave,
 } InfraredProgressViewInput;
 
 /** Callback for input handling */

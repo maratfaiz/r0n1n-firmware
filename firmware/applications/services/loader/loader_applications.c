@@ -1,5 +1,6 @@
 #include "loader.h"
 #include "loader_applications.h"
+#include "loader_menu.h"
 #include <dialogs/dialogs.h>
 #include <flipper_application/flipper_application.h>
 #include <assets_icons.h>
@@ -11,7 +12,7 @@
 
 #define TAG "LoaderApplications"
 
-#define JS_RUNNER_APP EXT_PATH("apps/assets/js_app.fap")
+#define JS_RUNNER_APP "JS Runner"
 
 struct LoaderApplications {
     FuriThread* thread;
@@ -87,8 +88,12 @@ static bool loader_applications_item_callback(
     LoaderApplicationsApp* loader_applications_app = context;
     furi_assert(loader_applications_app);
     if(furi_string_end_with(path, ".fap")) {
-        return flipper_application_load_name_and_icon(
+        bool loaded = flipper_application_load_name_and_icon(
             path, loader_applications_app->storage, icon_ptr, item_name);
+        const char* name = furi_string_get_cstr(item_name);
+        const char* display_name = loader_display_name(name);
+        if(display_name != name) furi_string_set(item_name, display_name);
+        return loaded;
     } else {
         path_extract_filename(path, item_name, false);
         memcpy(*icon_ptr, icon_get_frame_data(&I_js_script_10px, 0), FAP_MANIFEST_MAX_ICON_SIZE);
@@ -141,7 +146,6 @@ static void
     }
 
     furi_pubsub_unsubscribe(loader_get_pubsub(app->loader), subscription);
-    furi_thread_flags_clear(APPLICATION_STOP_EVENT);
 }
 
 static int32_t loader_applications_thread(void* p) {

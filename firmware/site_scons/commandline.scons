@@ -69,7 +69,7 @@ vars.AddVariables(
     BoolVariable(
         "DEBUG",
         help="Enable debug build",
-        default=False,
+        default=True,
     ),
     BoolVariable(
         "LIB_DEBUG",
@@ -79,7 +79,7 @@ vars.AddVariables(
     BoolVariable(
         "COMPACT",
         help="Optimize for size",
-        default=True,
+        default=False,
     ),
     EnumVariable(
         "TARGET_HW",
@@ -99,11 +99,6 @@ vars.AddVariables(
         "UPDATE_VERSION_STRING",
         "Version string for updater package",
         "${DIST_SUFFIX}",
-    ),
-    (
-        "FORCE_NO_DIRTY",
-        "Force disable dirty status of the build",
-        "",
     ),
     (
         "COPRO_CUBE_VERSION",
