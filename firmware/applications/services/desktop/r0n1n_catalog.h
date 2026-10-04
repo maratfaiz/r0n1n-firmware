@@ -79,3 +79,15 @@ const char* r0n1n_catalog_settings_label(const char* name);
 
 /** Icon for a stock settings app name. */
 const Icon* r0n1n_catalog_settings_icon(const char* name);
+
+/* One setting inside a settings app, for Search: "ПИН-код" finds the PIN
+ * entry of Desktop settings and opens it right there. */
+typedef struct {
+    const char* label; // shown in the results
+    const char* keywords; // other words it is found by
+    const char* app; // Loader name of the settings app, or R0N1N_APP_SETTINGS
+    const char* args; // which item the app opens on (see each settings app)
+} R0n1nSettingItem;
+
+extern const R0n1nSettingItem r0n1n_setting_items[];
+extern const size_t r0n1n_setting_items_count;

@@ -327,6 +327,9 @@ static void desktop_apply_settings(Desktop* desktop) {
         desktop->animation_manager, desktop->settings.dummy_mode);
 
     if(!desktop->app_running && !desktop->locked) {
+        // Settings can now change while armed (Control Center's Auto-lock
+        // tile): disarm first so the delay is new and the subscription single.
+        desktop_auto_lock_inhibit(desktop);
         desktop_auto_lock_arm(desktop);
     }
 

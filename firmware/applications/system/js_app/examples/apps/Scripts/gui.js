@@ -25,12 +25,12 @@ let cuteDolphinWithWatch = icon.getBuiltin("DolphinWait_59x54");
 let jsLogo = icon.getBuiltin("js_script_10px");
 let stopwatchWidgetElements = [
     { element: "string", x: 67, y: 44, align: "bl", font: "big_numbers", text: "00 00" },
-    { element: "string", x: 77, y: 22, align: "bl", font: "primary", text: "Stopwatch" },
+    { element: "string", x: 77, y: 22, align: "bl", font: "primary", text: "Секундомер" },
     { element: "rect", x: 64, y: 27, w: 28, h: 20, radius: 3, fill: false },
     { element: "rect", x: 100, y: 27, w: 28, h: 20, radius: 3, fill: false },
     { element: "icon", x: 0, y: 5, iconData: cuteDolphinWithWatch },
     { element: "icon", x: 64, y: 13, iconData: jsLogo },
-    { element: "button", button: "right", text: "Back" },
+    { element: "button", button: "right", text: "Назад" },
 ];
 
 // icons for the button panel
@@ -43,7 +43,7 @@ let views = {
     loading: loadingView.make(),
     empty: emptyView.make(),
     keyboard: textInputView.makeWith({
-        header: "Enter your name",
+        header: "Как вас зовут?",
         minLength: 0,
         maxLength: 32,
         defaultText: flipper.getName(),
@@ -51,19 +51,19 @@ let views = {
     }),
     helloDialog: dialogView.make(),
     bytekb: byteInputView.makeWith({
-        header: "Look ma, I'm a header text!",
+        header: "Это текст заголовка!",
         length: 8,
         defaultData: Uint8Array([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]),
     }),
     longText: textBoxView.makeWith({
-        text: "This is a very long string that demonstrates the TextBox view. Use the D-Pad to scroll backwards and forwards.\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse rhoncus est malesuada quam egestas ultrices. Maecenas non eros a nulla eleifend vulputate et ut risus. Quisque in mauris mattis, venenatis risus eget, aliquam diam. Fusce pretium feugiat mauris, ut faucibus ex volutpat in. Phasellus volutpat ex sed gravida consectetur. Aliquam sed lectus feugiat, tristique lectus et, bibendum lacus. Ut sit amet augue eu sapien elementum aliquam quis vitae tortor. Vestibulum quis commodo odio. In elementum fermentum massa, eu pellentesque nibh cursus at. Integer eleifend lacus nec purus elementum sodales. Nulla elementum neque urna, non vulputate massa semper sed. Fusce ut nisi vitae dui blandit congue pretium vitae turpis.",
+        text: "Это длинный текст для примера TextBox. Листайте его кнопками вверх и вниз.\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse rhoncus est malesuada quam egestas ultrices. Maecenas non eros a nulla eleifend vulputate et ut risus. Quisque in mauris mattis, venenatis risus eget, aliquam diam. Fusce pretium feugiat mauris, ut faucibus ex volutpat in. Phasellus volutpat ex sed gravida consectetur. Aliquam sed lectus feugiat, tristique lectus et, bibendum lacus. Ut sit amet augue eu sapien elementum aliquam quis vitae tortor. Vestibulum quis commodo odio. In elementum fermentum massa, eu pellentesque nibh cursus at. Integer eleifend lacus nec purus elementum sodales. Nulla elementum neque urna, non vulputate massa semper sed. Fusce ut nisi vitae dui blandit congue pretium vitae turpis.",
     }),
     stopwatchWidget: widget.makeWith({}, stopwatchWidgetElements),
     buttonMenu: buttonMenuView.makeWith({
-        header: "Header"
+        header: "Заголовок"
     }, [
-        { type: "common", label: "Test" },
-        { type: "control", label: "Test2" },
+        { type: "common", label: "Тест" },
+        { type: "control", label: "Тест 2" },
     ]),
     buttonPanel: buttonPanelView.makeWith({
         matrixSizeX: 2,
@@ -71,44 +71,44 @@ let views = {
     }, [
         { type: "button", x: 0, y: 0, matrixX: 0, matrixY: 0, icon: offIcons[0], iconSelected: offIcons[1] },
         { type: "button", x: 30, y: 30, matrixX: 1, matrixY: 1, icon: powerIcons[0], iconSelected: powerIcons[1] },
-        { type: "label", x: 0, y: 50, text: "Label", font: "primary" },
+        { type: "label", x: 0, y: 50, text: "Подпись", font: "primary" },
     ]),
     menu: menuView.makeWith({}, [
-        { label: "One", icon: settingsIcon },
-        { label: "Two", icon: settingsIcon },
-        { label: "three", icon: settingsIcon },
+        { label: "Один", icon: settingsIcon },
+        { label: "Два", icon: settingsIcon },
+        { label: "Три", icon: settingsIcon },
     ]),
     numberKbd: numberInputView.makeWith({
-        header: "Number input",
+        header: "Ввод числа",
         defaultValue: 100,
         minValue: 0,
         maxValue: 200,
     }),
     popup: popupView.makeWith({
-        header: "Hello",
-        text: "I'm going to be gone\nin 2 seconds",
+        header: "Привет",
+        text: "Я исчезну\nчерез 2 секунды",
     }),
     viList: viListView.makeWith({}, [
-        { label: "One", variants: ["1", "1.0"] },
-        { label: "Two", variants: ["2", "2.0"] },
+        { label: "Один", variants: ["1", "1.0"] },
+        { label: "Два", variants: ["2", "2.0"] },
     ]),
     demos: submenuView.makeWith({
-        header: "Choose a demo",
+        header: "Выберите пример",
     }, [
-        "Hourglass screen",
-        "Empty screen",
-        "Text input & Dialog",
-        "Byte input",
-        "Text box",
-        "File picker",
-        "Widget",
-        "Button menu",
-        "Button panel",
-        "Menu",
-        "Number input",
-        "Popup",
-        "Var. item list",
-        "Exit app",
+        "Песочные часы",
+        "Пустой экран",
+        "Ввод текста и диалог",
+        "Ввод байтов",
+        "Текстовое окно",
+        "Выбор файла",
+        "Виджет",
+        "Меню кнопок",
+        "Панель кнопок",
+        "Меню",
+        "Ввод числа",
+        "Всплывающее окно",
+        "Список настроек",
+        "Выйти",
     ]),
 };
 
@@ -132,11 +132,11 @@ eventLoop.subscribe(views.demos.chosen, function (_sub, index, gui, eventLoop, v
     } else if (index === 5) {
         let path = filePicker.pickFile("/ext", "*");
         if (path) {
-            views.helloDialog.set("text", "You selected:\n" + path);
+            views.helloDialog.set("text", "Вы выбрали:\n" + path);
         } else {
-            views.helloDialog.set("text", "You didn't select a file");
+            views.helloDialog.set("text", "Файл не выбран");
         }
-        views.helloDialog.set("center", "Nice!");
+        views.helloDialog.set("center", "Отлично!");
         gui.viewDispatcher.switchTo(views.helloDialog);
     } else if (index === 6) {
         gui.viewDispatcher.switchTo(views.stopwatchWidget);
@@ -161,8 +161,8 @@ eventLoop.subscribe(views.demos.chosen, function (_sub, index, gui, eventLoop, v
 // say hi after keyboard input
 eventLoop.subscribe(views.keyboard.input, function (_sub, name, gui, views) {
     views.keyboard.set("defaultText", name); // Remember for next usage
-    views.helloDialog.set("text", "Hi " + name + "! :)");
-    views.helloDialog.set("center", "Hi Flipper! :)");
+    views.helloDialog.set("text", "Привет, " + name + "! :)");
+    views.helloDialog.set("center", "Привет, Flipper! :)");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 
@@ -179,8 +179,8 @@ eventLoop.subscribe(views.bytekb.input, function (_sub, data, gui, views) {
     for (let i = 0; i < data_view.length; i++) {
         text += data_view[i].toString(16);
     }
-    views.helloDialog.set("text", "You typed:\n" + text);
-    views.helloDialog.set("center", "Cool!");
+    views.helloDialog.set("text", "Вы ввели:\n" + text);
+    views.helloDialog.set("center", "Класс!");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 
@@ -225,29 +225,29 @@ eventLoop.subscribe(views.popup.timeout, function (_sub, _item, gui, views) {
 
 // button menu callback
 eventLoop.subscribe(views.buttonMenu.input, function (_sub, input, gui, views) {
-    views.helloDialog.set("text", "You selected #" + input.index.toString());
-    views.helloDialog.set("center", "Cool!");
+    views.helloDialog.set("text", "Вы выбрали №" + input.index.toString());
+    views.helloDialog.set("center", "Класс!");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 
 // button panel callback
 eventLoop.subscribe(views.buttonPanel.input, function (_sub, input, gui, views) {
-    views.helloDialog.set("text", "You selected #" + input.index.toString());
-    views.helloDialog.set("center", "Cool!");
+    views.helloDialog.set("text", "Вы выбрали №" + input.index.toString());
+    views.helloDialog.set("center", "Класс!");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 
 // menu callback
 eventLoop.subscribe(views.menu.chosen, function (_sub, index, gui, views) {
-    views.helloDialog.set("text", "You selected #" + index.toString());
-    views.helloDialog.set("center", "Cool!");
+    views.helloDialog.set("text", "Вы выбрали №" + index.toString());
+    views.helloDialog.set("center", "Класс!");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 
 // menu callback
 eventLoop.subscribe(views.numberKbd.input, function (_sub, number, gui, views) {
-    views.helloDialog.set("text", "You typed " + number.toString());
-    views.helloDialog.set("center", "Cool!");
+    views.helloDialog.set("text", "Вы ввели " + number.toString());
+    views.helloDialog.set("center", "Класс!");
     gui.viewDispatcher.switchTo(views.helloDialog);
 }, gui, views);
 

@@ -66,9 +66,9 @@ void nfc_render_mf_desfire_version(const MfDesfireVersion* data, FuriString* str
         data->uid[6]);
     furi_string_cat_printf(
         str,
-        "hw %02x type %02x sub %02x\n"
-        " maj %02x min %02x\n"
-        " size %02x proto %02x\n",
+        "HW %02x тип %02x подтип %02x\n"
+        " версия %02x.%02x\n"
+        " размер %02x прот. %02x\n",
         data->hw_vendor,
         data->hw_type,
         data->hw_subtype,
@@ -78,9 +78,9 @@ void nfc_render_mf_desfire_version(const MfDesfireVersion* data, FuriString* str
         data->hw_proto);
     furi_string_cat_printf(
         str,
-        "sw %02x type %02x sub %02x\n"
-        " maj %02x min %02x\n"
-        " size %02x proto %02x\n",
+        "SW %02x тип %02x подтип %02x\n"
+        " версия %02x.%02x\n"
+        " размер %02x прот. %02x\n",
         data->sw_vendor,
         data->sw_type,
         data->sw_subtype,
@@ -90,8 +90,8 @@ void nfc_render_mf_desfire_version(const MfDesfireVersion* data, FuriString* str
         data->sw_proto);
     furi_string_cat_printf(
         str,
-        "batch %02x:%02x:%02x:%02x:%02x\n"
-        "week %02x year 20%02x\n",
+        "партия %02x:%02x:%02x:%02x:%02x\n"
+        "неделя %02x год 20%02x\n",
         data->batch[0],
         data->batch[1],
         data->batch[2],
@@ -166,22 +166,22 @@ void nfc_render_mf_desfire_file_settings_data(
     const char* type;
     switch(settings->type) {
     case MfDesfireFileTypeStandard:
-        type = "standard";
+        type = "стандарт";
         break;
     case MfDesfireFileTypeBackup:
-        type = "backup";
+        type = "резерв";
         break;
     case MfDesfireFileTypeValue:
-        type = "value";
+        type = "значение";
         break;
     case MfDesfireFileTypeLinearRecord:
-        type = "linear";
+        type = "линейный";
         break;
     case MfDesfireFileTypeCyclicRecord:
-        type = "cyclic";
+        type = "циклич.";
         break;
     case MfDesfireFileTypeTransactionMac:
-        type = "txn-mac";
+        type = "MAC транз.";
         break;
     default:
         type = "неизвестно";
@@ -190,13 +190,13 @@ void nfc_render_mf_desfire_file_settings_data(
     const char* comm;
     switch(settings->comm) {
     case MfDesfireFileCommunicationSettingsPlaintext:
-        comm = "plain";
+        comm = "открытый";
         break;
     case MfDesfireFileCommunicationSettingsAuthenticated:
-        comm = "auth";
+        comm = "с аутент.";
         break;
     case MfDesfireFileCommunicationSettingsEnciphered:
-        comm = "enciphered";
+        comm = "шифрованный";
         break;
     default:
         comm = "неизвестно";
@@ -207,7 +207,7 @@ void nfc_render_mf_desfire_file_settings_data(
     for(size_t i = 0; i < settings->access_rights_len; i++) {
         furi_string_cat_printf(
             str,
-            "r %d w %d rw %d c %d\n",
+            "чт %d зап %d чз %d изм %d\n",
             settings->access_rights[i] >> 12 & 0xF,
             settings->access_rights[i] >> 8 & 0xF,
             settings->access_rights[i] >> 4 & 0xF,
@@ -221,15 +221,15 @@ void nfc_render_mf_desfire_file_settings_data(
     case MfDesfireFileTypeStandard:
     case MfDesfireFileTypeBackup:
         record_size = settings->data.size;
-        furi_string_cat_printf(str, "size %lu\n", record_size);
+        furi_string_cat_printf(str, "размер %lu\n", record_size);
         break;
     case MfDesfireFileTypeValue:
         record_size = MF_DESFIRE_VALUE_SIZE;
         furi_string_cat_printf(
-            str, "lo %lu hi %lu\n", settings->value.lo_limit, settings->value.hi_limit);
+            str, "мин %lu макс %lu\n", settings->value.lo_limit, settings->value.hi_limit);
         furi_string_cat_printf(
             str,
-            "limit %lu enabled %d\n",
+            "лимит %lu вкл %d\n",
             settings->value.limited_credit_value,
             settings->value.limited_credit_enabled);
         break;
@@ -237,17 +237,17 @@ void nfc_render_mf_desfire_file_settings_data(
     case MfDesfireFileTypeCyclicRecord:
         record_count = settings->record.cur;
         record_size = settings->record.size;
-        furi_string_cat_printf(str, "size %lu\n", record_size);
-        furi_string_cat_printf(str, "num %lu max %lu\n", record_count, settings->record.max);
+        furi_string_cat_printf(str, "размер %lu\n", record_size);
+        furi_string_cat_printf(str, "записей %lu из %lu\n", record_count, settings->record.max);
         break;
     case MfDesfireFileTypeTransactionMac:
         record_count = 0;
         furi_string_cat_printf(
             str,
-            "key opt %02X ver %02X\n",
+            "опц. ключа %02X вер. %02X\n",
             settings->transaction_mac.key_option,
             settings->transaction_mac.key_version);
-        furi_string_cat_printf(str, "cnt limit %lu\n", settings->transaction_mac.counter_limit);
+        furi_string_cat_printf(str, "лимит счёт. %lu\n", settings->transaction_mac.counter_limit);
         break;
     }
 

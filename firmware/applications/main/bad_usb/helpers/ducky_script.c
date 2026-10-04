@@ -220,7 +220,7 @@ static int32_t ducky_parse_line(BadUsbScript* bad_usb, FuriString* line) {
     char next_char = *line_cstr;
     key = modifiers | ducky_get_keycode(bad_usb, line_cstr, false);
 
-    if(key == 0 && next_char) ducky_error(bad_usb, "No keycode defined for %s", line_cstr);
+    if(key == 0 && next_char) ducky_error(bad_usb, "Нет кода клавиши для %s", line_cstr);
 
     bad_usb->hid->kb_press(bad_usb->hid_inst, key);
     bad_usb->hid->kb_release(bad_usb->hid_inst, key);

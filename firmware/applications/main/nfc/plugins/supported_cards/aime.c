@@ -135,7 +135,7 @@ static bool aime_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         furi_string_printf(
             parsed_data,
-            "\e#Aime Card\nAccess Code: \n%s\nChecksum: %02X%02X%02X\n",
+            "\e#Aime Card\nКод доступа: \n%s\nКонтр. сумма: %02X%02X%02X\n",
             aime_accesscode_str,
             aime_checksum[0],
             aime_checksum[1],

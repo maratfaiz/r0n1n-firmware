@@ -5,9 +5,10 @@
 #include "desktop_scene.h"
 #include "desktop_scene_r0n1n.h"
 
-// R0N1N Global Search, step 2: apps (built-in and on SD), settings and saved
-// captures whose names contain the query. Apps and settings come first (they
-// get timestamps above any real file time), then files, newest first.
+// R0N1N Global Search, step 2: apps (built-in and on SD), settings apps, the
+// settings inside them (r0n1n_setting_items) and saved captures matching the
+// query. Apps and settings come first (they get timestamps above any real
+// file time), then files, newest first.
 
 static uint32_t desktop_search_rank;
 
@@ -24,6 +25,7 @@ void desktop_scene_search_results_on_enter(void* context) {
     R0n1nList* list = desktop->r0n1n_list;
     const char* query = desktop->search_query;
 
+    desktop_r0n1n_history_push(desktop, query);
     desktop_r0n1n_entries_clear(desktop);
     desktop_search_rank = UINT32_MAX;
     for(size_t s = 0; s < R0n1nSectionCount; s++) {
@@ -44,6 +46,20 @@ void desktop_scene_search_results_on_enter(void* context) {
                 NULL,
                 label,
                 r0n1n_catalog_settings_icon(name),
+                desktop_search_rank--);
+        }
+    }
+    for(size_t i = 0; i < r0n1n_setting_items_count; i++) {
+        const R0n1nSettingItem* item = &r0n1n_setting_items[i];
+        if(desktop_r0n1n_matches(item->label, query) ||
+           desktop_r0n1n_matches(item->keywords, query)) {
+            desktop_r0n1n_entries_add(
+                desktop,
+                item->app,
+                item->args,
+                item->label,
+                strcmp(item->app, R0N1N_APP_SETTINGS) == 0 ? &I_R_Gear_9x7 :
+                                                             r0n1n_catalog_settings_icon(item->app),
                 desktop_search_rank--);
         }
     }

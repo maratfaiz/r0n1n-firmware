@@ -97,14 +97,21 @@ void desktop_settings_app_free(DesktopSettingsApp* app) {
 }
 
 extern int32_t desktop_settings_app(void* p) {
-    UNUSED(p);
-
     DesktopSettingsApp* app = desktop_settings_app_alloc();
     Desktop* desktop = furi_record_open(RECORD_DESKTOP);
 
     desktop_api_get_settings(desktop, &app->settings);
 
     scene_manager_next_scene(app->scene_manager, DesktopSettingsAppSceneStart);
+
+    // R0N1N Search opens a setting directly: "N" highlights item N, "N!" also
+    // enters it, the same event its OK press sends (r0n1n_setting_items).
+    const char* arg = p;
+    if(arg && arg[0] >= '0' && arg[0] <= '9') {
+        const uint32_t index = atoi(arg);
+        variable_item_list_set_selected_item(app->variable_item_list, index);
+        if(strchr(arg, '!')) view_dispatcher_send_custom_event(app->view_dispatcher, index);
+    }
 
     view_dispatcher_run(app->view_dispatcher);
 

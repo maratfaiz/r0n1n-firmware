@@ -43,21 +43,140 @@ static uint16_t desktop_r0n1n_fold(uint16_t code) {
     return code;
 }
 
+/* Smart search (docs/UX_DESIGN.md, "Feedback and search"): a query matches
+ * when it, or its transliteration into the other alphabet ("pitanie" finds
+ * "Питание", "ибуттон" finds "iButton"), appears in the text; a query of 4+
+ * letters also matches the start of a word with one typo, a missing or extra
+ * letter, or two neighbouring letters swapped. Buffers are static: the
+ * desktop thread is the only caller and its stack is small. */
+#define R0N1N_MATCH_TEXT  80
+#define R0N1N_MATCH_QUERY R0N1N_QUERY_SIZE
+#define R0N1N_MATCH_FUZZY 4
+
+static uint16_t r0n1n_match_text[R0N1N_MATCH_TEXT];
+static uint16_t r0n1n_match_query[3][R0N1N_MATCH_QUERY];
+
+static size_t desktop_r0n1n_decode(const char* s, uint16_t* out, size_t max) {
+    size_t n = 0;
+    uint16_t c;
+    while(*s && n < max) {
+        s += gui_utf8_char(s, &c);
+        out[n++] = desktop_r0n1n_fold(c);
+    }
+    return n;
+}
+
+static bool desktop_r0n1n_is_cyrillic(uint16_t c) {
+    return c >= 0x430 && c <= 0x44F;
+}
+
+// Latin -> Russian, longest spelling first ("sch" before "sh" before "s")
+static size_t desktop_r0n1n_to_cyrillic(const uint16_t* q, size_t n, uint16_t* out) {
+    static const struct {
+        const char* lat;
+        uint16_t cyr[2];
+    } table[] = {
+        {"sch", {0x449}}, {"sh", {0x448}},  {"ch", {0x447}},         {"zh", {0x436}},
+        {"kh", {0x445}},  {"ts", {0x446}},  {"yu", {0x44E}},         {"ya", {0x44F}},
+        {"yo", {0x435}},  {"ye", {0x435}},  {"a", {0x430}},          {"b", {0x431}},
+        {"c", {0x43A}},   {"d", {0x434}},   {"e", {0x435}},          {"f", {0x444}},
+        {"g", {0x433}},   {"h", {0x445}},   {"i", {0x438}},          {"j", {0x439}},
+        {"k", {0x43A}},   {"l", {0x43B}},   {"m", {0x43C}},          {"n", {0x43D}},
+        {"o", {0x43E}},   {"p", {0x43F}},   {"q", {0x43A}},          {"r", {0x440}},
+        {"s", {0x441}},   {"t", {0x442}},   {"u", {0x443}},          {"v", {0x432}},
+        {"w", {0x432}},   {"x", {0x43A, 0x441}}, {"y", {0x44B}},    {"z", {0x437}},
+    };
+    size_t o = 0;
+    for(size_t i = 0; i < n && o < R0N1N_MATCH_QUERY - 1;) {
+        bool done = false;
+        for(size_t k = 0; k < COUNT_OF(table) && !done; k++) {
+            const char* lat = table[k].lat;
+            size_t len = strlen(lat);
+            if(i + len > n) continue;
+            size_t j = 0;
+            while(j < len && q[i + j] == (uint8_t)lat[j]) j++;
+            if(j < len) continue;
+            out[o++] = table[k].cyr[0];
+            if(table[k].cyr[1] && o < R0N1N_MATCH_QUERY) out[o++] = table[k].cyr[1];
+            i += len;
+            done = true;
+        }
+        if(!done) out[o++] = q[i++];
+    }
+    return o;
+}
+
+// Russian -> Latin, as Russian speakers spell English names
+static size_t desktop_r0n1n_to_latin(const uint16_t* q, size_t n, uint16_t* out) {
+    static const char* const table[32] = {
+        "a", "b", "v", "g", "d", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p",
+        "r", "s", "t", "u", "f", "h", "c", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya"};
+    size_t o = 0;
+    for(size_t i = 0; i < n; i++) {
+        const char* lat = desktop_r0n1n_is_cyrillic(q[i]) ? table[q[i] - 0x430] : NULL;
+        if(!lat) {
+            if(o < R0N1N_MATCH_QUERY) out[o++] = q[i];
+            continue;
+        }
+        for(; *lat && o < R0N1N_MATCH_QUERY; lat++) out[o++] = (uint8_t)*lat;
+    }
+    return o;
+}
+
+static bool desktop_r0n1n_prefix(const uint16_t* t, size_t tn, const uint16_t* q, size_t qn) {
+    if(qn > tn) return false;
+    for(size_t i = 0; i < qn; i++) {
+        if(t[i] != q[i]) return false;
+    }
+    return true;
+}
+
+// Does the text starting here begin with the query, give or take one edit?
+static bool desktop_r0n1n_near_prefix(const uint16_t* t, size_t tn, const uint16_t* q, size_t qn) {
+    size_t i = 0;
+    while(i < qn && i < tn && t[i] == q[i]) i++;
+    if(i == qn) return true;
+    if(i < tn && desktop_r0n1n_prefix(t + i + 1, tn - i - 1, q + i + 1, qn - i - 1)) {
+        return true; // one wrong letter
+    }
+    if(desktop_r0n1n_prefix(t + i, tn - i, q + i + 1, qn - i - 1)) return true; // extra letter
+    if(i < tn && desktop_r0n1n_prefix(t + i + 1, tn - i - 1, q + i, qn - i)) {
+        return true; // missing letter
+    }
+    if(i + 1 < qn && i + 1 < tn && t[i] == q[i + 1] && t[i + 1] == q[i] &&
+       desktop_r0n1n_prefix(t + i + 2, tn - i - 2, q + i + 2, qn - i - 2)) {
+        return true; // swapped letters
+    }
+    return false;
+}
+
+static bool desktop_r0n1n_is_word_char(uint16_t c) {
+    return (c < 0x80 && isalnum(c)) || desktop_r0n1n_is_cyrillic(c);
+}
+
 bool desktop_r0n1n_matches(const char* text, const char* query) {
     if(!query || !query[0]) return true;
-    for(const char* start = text; *start;) {
-        const char* t = start;
-        const char* q = query;
-        uint16_t tc, qc;
-        while(*q && *t) {
-            size_t tl = gui_utf8_char(t, &tc);
-            size_t ql = gui_utf8_char(q, &qc);
-            if(desktop_r0n1n_fold(tc) != desktop_r0n1n_fold(qc)) break;
-            t += tl;
-            q += ql;
+    if(!text) return false;
+
+    const size_t tn = desktop_r0n1n_decode(text, r0n1n_match_text, R0N1N_MATCH_TEXT);
+    size_t qn[3];
+    qn[0] = desktop_r0n1n_decode(query, r0n1n_match_query[0], R0N1N_MATCH_QUERY);
+    qn[1] = desktop_r0n1n_to_cyrillic(r0n1n_match_query[0], qn[0], r0n1n_match_query[1]);
+    qn[2] = desktop_r0n1n_to_latin(r0n1n_match_query[0], qn[0], r0n1n_match_query[2]);
+
+    for(size_t v = 0; v < 3; v++) {
+        const uint16_t* q = r0n1n_match_query[v];
+        if(v > 0 && qn[v] == qn[0] && memcmp(q, r0n1n_match_query[0], qn[0] * 2) == 0) {
+            continue; // nothing to transliterate
         }
-        if(!*q) return true;
-        start += gui_utf8_char(start, &tc);
+        for(size_t s = 0; s < tn; s++) {
+            if(desktop_r0n1n_prefix(r0n1n_match_text + s, tn - s, q, qn[v])) return true;
+        }
+        if(qn[v] < R0N1N_MATCH_FUZZY) continue;
+        for(size_t s = 0; s < tn; s++) {
+            if(s > 0 && desktop_r0n1n_is_word_char(r0n1n_match_text[s - 1])) continue;
+            if(desktop_r0n1n_near_prefix(r0n1n_match_text + s, tn - s, q, qn[v])) return true;
+        }
     }
     return false;
 }
@@ -85,7 +204,7 @@ bool desktop_r0n1n_launch(Desktop* desktop, const char* target, const char* args
     furi_assert(target);
 
     if(strcmp(target, R0N1N_APP_SETTINGS) == 0) {
-        scene_manager_next_scene(desktop->scene_manager, DesktopSceneR0n1nSettings);
+        desktop_scene_r0n1n_settings_open(desktop, args);
         return true;
     }
 
@@ -159,8 +278,93 @@ void desktop_r0n1n_entries_add(
     desktop->r0n1n_entry_count++;
 }
 
-#define R0N1N_INDEX_DIR  EXT_PATH(".r0n1n")
-#define R0N1N_INDEX_PATH R0N1N_INDEX_DIR "/captures.idx"
+#define R0N1N_INDEX_DIR    EXT_PATH(".r0n1n")
+#define R0N1N_INDEX_PATH   R0N1N_INDEX_DIR "/captures.idx"
+#define R0N1N_HISTORY_PATH R0N1N_INDEX_DIR "/searches.txt"
+
+// Recent searches: one query per line, newest first. Without an SD card they
+// still last until reboot.
+static void desktop_r0n1n_history_load(Desktop* desktop) {
+    if(desktop->search_history_loaded) return;
+    desktop->search_history_loaded = true;
+    desktop->search_history_count = 0;
+
+    char buf[R0N1N_HISTORY_MAX * R0N1N_QUERY_SIZE];
+    File* in = storage_file_alloc(desktop->storage);
+    size_t size = 0;
+    if(storage_file_open(in, R0N1N_HISTORY_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        size = storage_file_read(in, buf, sizeof(buf) - 1);
+    }
+    storage_file_close(in);
+    storage_file_free(in);
+    buf[size] = 0;
+
+    for(char* line = buf; *line && desktop->search_history_count < R0N1N_HISTORY_MAX;) {
+        char* end = strchr(line, '\n');
+        if(end) *end = 0;
+        if(*line) {
+            strlcpy(
+                desktop->search_history[desktop->search_history_count++],
+                line,
+                R0N1N_QUERY_SIZE);
+        }
+        if(!end) break;
+        line = end + 1;
+    }
+}
+
+void desktop_r0n1n_history_push(Desktop* desktop, const char* query) {
+    if(!query || !query[0]) return;
+    desktop_r0n1n_history_load(desktop);
+
+    // Drop an older copy, shift down, put the query on top
+    uint8_t count = desktop->search_history_count;
+    for(uint8_t i = 0; i < count; i++) {
+        if(strcmp(desktop->search_history[i], query) == 0) {
+            memmove(
+                desktop->search_history[i],
+                desktop->search_history[i + 1],
+                (count - i - 1) * R0N1N_QUERY_SIZE);
+            count--;
+            break;
+        }
+    }
+    if(count == R0N1N_HISTORY_MAX) count--;
+    memmove(desktop->search_history[1], desktop->search_history[0], count * R0N1N_QUERY_SIZE);
+    strlcpy(desktop->search_history[0], query, R0N1N_QUERY_SIZE);
+    desktop->search_history_count = count + 1;
+
+    // Saving bumps the SD change counter; don't let that make a fresh capture
+    // index look stale (it would be rebuilt on every search).
+    uint32_t before = 0;
+    storage_common_timestamp(desktop->storage, EXT_PATH(""), &before);
+    const bool index_fresh = desktop->capture_index_token &&
+                             desktop->capture_index_token == before;
+
+    storage_simply_mkdir(desktop->storage, R0N1N_INDEX_DIR);
+    File* out = storage_file_alloc(desktop->storage);
+    if(storage_file_open(out, R0N1N_HISTORY_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        for(uint8_t i = 0; i < desktop->search_history_count; i++) {
+            storage_file_write(
+                out, desktop->search_history[i], strlen(desktop->search_history[i]));
+            storage_file_write(out, "\n", 1);
+        }
+    }
+    storage_file_close(out);
+    storage_file_free(out);
+
+    if(index_fresh) {
+        storage_common_timestamp(desktop->storage, EXT_PATH(""), &desktop->capture_index_token);
+    }
+}
+
+void desktop_r0n1n_open_search(Desktop* desktop) {
+    desktop_r0n1n_history_load(desktop);
+    desktop->search_query[0] = 0;
+    scene_manager_next_scene(
+        desktop->scene_manager,
+        desktop->search_history_count ? DesktopSceneSearchHistory : DesktopSceneSearch);
+}
 
 // One capture as an index line: "<type>\t<timestamp>\t<label>\t<path>".
 // Reading the index avoids re-walking every capture directory and stat-ing

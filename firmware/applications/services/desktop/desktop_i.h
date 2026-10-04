@@ -74,6 +74,7 @@ typedef struct {
 // argument or empty, `label` the row text.
 #define R0N1N_ENTRIES_MAX 64
 #define R0N1N_QUERY_SIZE  48
+#define R0N1N_HISTORY_MAX 5
 
 // Icon of an SD app, from its manifest, usable wherever an Icon is
 typedef struct {
@@ -162,10 +163,12 @@ struct Desktop {
     size_t r0n1n_icon_count;
     uint32_t capture_index_token; // storage change counter the index was built at; 0 = stale
     char search_query[R0N1N_QUERY_SIZE];
+    char search_history[R0N1N_HISTORY_MAX][R0N1N_QUERY_SIZE]; // newest first
+    uint8_t search_history_count;
+    bool search_history_loaded;
     const char* info_text; // shown by DesktopSceneInfo
     uint8_t section; // section opened from the carousel or the menu
     uint8_t picker_slot; // Quick Actions slot being reassigned
-    float cc_saved_volume; // speaker volume to restore when Sound is re-enabled
 
     bool in_transition;
     bool app_running;
@@ -194,6 +197,12 @@ void desktop_run_archive(Desktop* desktop);
 /** Launch a Loader name, .fap path, "<file>.fap" (searched under /ext/apps) or
  * R0N1N_APP_* target. Returns false if a "<file>.fap" target isn't installed. */
 bool desktop_r0n1n_launch(Desktop* desktop, const char* target, const char* args);
+
+/** Open Search: recent queries first if there are any, else the keyboard. */
+void desktop_r0n1n_open_search(Desktop* desktop);
+
+/** Put `query` at the top of the recent searches and save them to the SD card. */
+void desktop_r0n1n_history_push(Desktop* desktop, const char* query);
 
 /** Resolve "<file>.fap" to its path under /ext/apps/<category>/. */
 bool desktop_r0n1n_find_fap(Desktop* desktop, const char* file_name, FuriString* path);

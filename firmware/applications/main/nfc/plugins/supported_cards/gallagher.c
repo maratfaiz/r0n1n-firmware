@@ -61,7 +61,7 @@ static bool gallagher_parse(const NfcDevice* device, FuriString* parsed_data) {
 
     furi_string_cat_printf(
         parsed_data,
-        "\e#Gallagher NZ\nFacility %c%u\nCard %lu (IL %u)",
+        "\e#Gallagher NZ\nОбъект %c%u\nКарта %lu (IL %u)",
         display_region,
         credential.facility,
         credential.card,

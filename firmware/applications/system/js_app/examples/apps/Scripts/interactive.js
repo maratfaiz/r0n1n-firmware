@@ -18,12 +18,12 @@ let ctx = {
 
 let views = {
     dialog: dialog.makeWith({
-        header: "Interactive Console",
-        text: "Press OK to Start",
-        center: "Run Some JS"
+        header: "Консоль JS",
+        text: "Нажмите OK для старта",
+        center: "Запустить JS"
     }),
     textInput: textInput.makeWith({
-        header: "Type JavaScript Code:",
+        header: "Введите код JS:",
         minLength: 0,
         maxLength: 256,
         defaultText: "2+2",
@@ -88,6 +88,6 @@ eventLoop.subscribe(gui.viewDispatcher.navigation, function (_sub, _, eventLoop)
 gui.viewDispatcher.switchTo(views.dialog);
 
 // Message behind GUI if something breaks
-print("If you're stuck here, something went wrong, re-run the script")
+print("Если застряли здесь - что-то пошло не так, перезапустите скрипт")
 eventLoop.run();
-print("\n\nFinished correctly :)")
+print("\n\nГотово :)")

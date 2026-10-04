@@ -610,7 +610,7 @@ bool ndef_parse_record(
         // Dump data without parsing
         furi_string_cat(ndef->output, "Неизвестно\n");
         ndef_print(ndef, "Стандартный тип", type, type_len, false);
-        if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
+        if(!ndef_dump(ndef, "Данные", pos, len, false)) return false;
         return true;
 
     case NdefTnfMediaType:
@@ -624,7 +624,7 @@ bool ndef_parse_record(
         // Dump data without parsing
         furi_string_cat(ndef->output, "Неизвестно\n");
         ndef_print(ndef, "MIME-тип", type, type_len, false);
-        if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
+        if(!ndef_dump(ndef, "Данные", pos, len, false)) return false;
         return true;
 
     case NdefTnfEmpty:
@@ -638,7 +638,7 @@ bool ndef_parse_record(
         furi_string_cat(ndef->output, "Не поддерживается\n");
         ndef_print(ndef, "Формат типа", &tnf, 1, true);
         ndef_print(ndef, "Тип", type, type_len, false);
-        if(!ndef_dump(ndef, "Payload", pos, len, false)) return false;
+        if(!ndef_dump(ndef, "Данные", pos, len, false)) return false;
         return true;
     }
 }
@@ -728,9 +728,9 @@ bool ndef_parse_message(Ndef* ndef, size_t pos, size_t len, size_t message_num, 
 
     if(record_num == 0) {
         if(smart_poster) {
-            furi_string_cat(ndef->output, "\e*> SP: Empty\n\n");
+            furi_string_cat(ndef->output, "\e*> SP: пусто\n\n");
         } else {
-            furi_string_cat_printf(ndef->output, "\e*> M%zu: Empty\n\n", message_num);
+            furi_string_cat_printf(ndef->output, "\e*> M%zu: пусто\n\n", message_num);
         }
     }
 

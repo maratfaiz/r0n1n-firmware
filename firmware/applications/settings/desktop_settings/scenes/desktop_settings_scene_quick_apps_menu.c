@@ -24,12 +24,7 @@ void desktop_settings_scene_quick_apps_menu_on_enter(void* context) {
         desktop_settings_scene_quick_apps_menu_submenu_callback,
         app);
 
-    submenu_add_item(
-        submenu,
-        "Режим Dummy",
-        DesktopSettingsCustomEventSetDummy,
-        desktop_settings_scene_quick_apps_menu_submenu_callback,
-        app);
+    // R0N1N has no dummy mode (desktop.c), so no favorites to set for it.
 
     submenu_set_header(app->submenu, "Быстрый запуск");
     submenu_set_selected_item(app->submenu, app->quick_apps_menu_idx);

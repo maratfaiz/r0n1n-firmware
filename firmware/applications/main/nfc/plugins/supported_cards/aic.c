@@ -617,7 +617,7 @@ bool aic_parse(const NfcDevice* device, FuriString* parsed_data) {
         access_code[i * 2] = (decrypted[i + 6] & 0xF0) >> 4; // Get upper nibble
         access_code[i * 2 + 1] = decrypted[i + 6] & 0x0F; // Get lower nibble
     }
-    furi_string_cat_str(parsed_data, "\nAccess Code:\n");
+    furi_string_cat_str(parsed_data, "\nКод доступа:\n");
     bool access_code_is_bcd = true;
     for(int i = 0; i < 20; i++) {
         furi_string_cat_printf(parsed_data, "%d", access_code[i]);
@@ -628,7 +628,7 @@ bool aic_parse(const NfcDevice* device, FuriString* parsed_data) {
     }
     furi_string_cat_str(parsed_data, "\n");
 
-    furi_string_cat_printf(parsed_data, "BCD верен: %s\n", access_code_is_bcd ? "Yes" : "No");
+    furi_string_cat_printf(parsed_data, "BCD верен: %s\n", access_code_is_bcd ? "да" : "нет");
     furi_string_cat_str(
         parsed_data, "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
 
@@ -643,7 +643,7 @@ bool aic_parse(const NfcDevice* device, FuriString* parsed_data) {
 
     furi_string_cat_str(
         parsed_data, "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
-    furi_string_cat_str(parsed_data, "\nDecrypted S-PAD 0:\n");
+    furi_string_cat_str(parsed_data, "\nРасшифр. S-PAD 0:\n");
     for(int i = 0; i < 16; i++) {
         furi_string_cat_printf(parsed_data, "%02X ", decrypted[i]);
         if(i == 7) {

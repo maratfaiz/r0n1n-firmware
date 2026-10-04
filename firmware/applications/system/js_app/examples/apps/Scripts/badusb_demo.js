@@ -7,9 +7,9 @@ let dialog = require("gui/dialog");
 
 let views = {
     dialog: dialog.makeWith({
-        header: "BadUSB demo",
-        text: "Press OK to start",
-        center: "Start",
+        header: "Пример BadUSB",
+        text: "Нажмите OK для старта",
+        center: "Старт",
     }),
 };
 
@@ -29,7 +29,7 @@ eventLoop.subscribe(views.dialog.input, function (_sub, button, eventLoop, gui) 
 
     if (badusb.isConnected()) {
         notify.blink("green", "short");
-        print("USB is connected");
+        print("USB подключён");
 
         badusb.println("Hello, world!");
 
@@ -55,7 +55,7 @@ eventLoop.subscribe(views.dialog.input, function (_sub, button, eventLoop, gui) 
 
         notify.success();
     } else {
-        print("USB not connected");
+        print("USB не подключён");
         notify.error();
     }
 

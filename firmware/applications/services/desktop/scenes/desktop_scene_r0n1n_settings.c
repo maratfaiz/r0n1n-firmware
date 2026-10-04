@@ -13,6 +13,27 @@
 #define R0N1N_SETTINGS_FEEDBACK  0xFFFD
 #define R0N1N_SETTINGS_WALLPAPER 0xFFFC
 
+void desktop_scene_r0n1n_settings_open(Desktop* desktop, const char* item) {
+    static const struct {
+        const char* key;
+        uint32_t item;
+    } keys[] = {
+        {"simple", R0N1N_SETTINGS_SIMPLE},
+        {"feedback", R0N1N_SETTINGS_FEEDBACK},
+        {"wallpaper", R0N1N_SETTINGS_WALLPAPER},
+        {"profile", R0N1N_SETTINGS_PROFILE},
+    };
+    uint32_t selected = 0;
+    for(size_t i = 0; item && i < COUNT_OF(keys); i++) {
+        if(strcmp(item, keys[i].key) == 0) selected = keys[i].item;
+    }
+    scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneR0n1nSettings, selected);
+    scene_manager_next_scene(desktop->scene_manager, DesktopSceneR0n1nSettings);
+    if(selected == R0N1N_SETTINGS_PROFILE) {
+        scene_manager_next_scene(desktop->scene_manager, DesktopSceneProfiles);
+    }
+}
+
 void desktop_scene_r0n1n_settings_on_enter(void* context) {
     Desktop* desktop = context;
     R0n1nList* list = desktop->r0n1n_list;

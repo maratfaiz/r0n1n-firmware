@@ -96,7 +96,7 @@ static bool itso_parse(const NfcDevice* device, FuriString* parsed_data) {
         FuriString* timestamp_str = furi_string_alloc();
         locale_format_date(timestamp_str, &timestamp, locale_get_date_format(), "-");
 
-        furi_string_cat(parsed_data, "\nExpiry: ");
+        furi_string_cat(parsed_data, "\nСрок действия: ");
         furi_string_cat(parsed_data, timestamp_str);
 
         furi_string_free(timestamp_str);

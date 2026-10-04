@@ -68,7 +68,7 @@ void desktop_lock_menu_draw_callback(Canvas* canvas, void* model) {
             if(m->dummy_mode) {
                 str = "Обычный режим";
             } else {
-                str = "Режим Dummy";
+                str = "Игровой режим";
             }
         }
 

@@ -82,14 +82,14 @@ const float volume_value[VOLUME_COUNT] = {
 
 #define DELAY_COUNT 11
 const char* const delay_text[DELAY_COUNT] = {
-    "1s",
-    "5s",
-    "10s",
-    "15s",
-    "30s",
-    "60s",
-    "90s",
-    "120s",
+    "1с",
+    "5с",
+    "10с",
+    "15с",
+    "30с",
+    "60с",
+    "90с",
+    "120с",
     "5мин",
     "10мин",
     "30мин",
@@ -260,8 +260,12 @@ static void free_settings(NotificationAppSettings* app) {
 }
 
 int32_t notification_settings_app(void* p) {
-    UNUSED(p);
     NotificationAppSettings* app = alloc_settings();
+    // R0N1N Search: "N" opens with item N highlighted (r0n1n_setting_items)
+    const char* arg = p;
+    if(arg && arg[0] >= '0' && arg[0] <= '9') {
+        variable_item_list_set_selected_item(app->variable_item_list, atoi(arg));
+    }
     view_dispatcher_run(app->view_dispatcher);
     notification_message_save_settings(app->notification);
     free_settings(app);

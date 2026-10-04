@@ -86,7 +86,7 @@ bool desktop_scene_menu_on_event(void* context, SceneManagerEvent event) {
     } else if(item == MenuCaptures) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneCaptures);
     } else if(item == MenuSearch) {
-        scene_manager_next_scene(desktop->scene_manager, DesktopSceneSearch);
+        desktop_r0n1n_open_search(desktop);
     } else if(item == MenuHub) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneHub);
     } else if(item == MenuAllApps) {

@@ -65,7 +65,10 @@ Russian everywhere, stock apps included:
 - apps keep their FAM names for launching; the stock menus show Russian
   names (`loader_display_name()`);
 - not translated: protocol dumps and file formats (UID, ATQA, Sub-GHz
-  key lines), CLI, logs, debug apps;
+  key lines), CLI, logs, debug apps, proper names (card brands, transit
+  station names in the Clipper parser) and the IR signal names the
+  universal remotes look up in their libraries (the remotes show Russian
+  pictures instead); the JS example scripts on the SD card print Russian;
 - the keyboard (`text_input.c`) has Russian, Latin and 123 layouts behind
   one key and edits whole UTF-8 characters. File names on the SD card
   (FAT, code page 850) can't hold Cyrillic, so it is transliterated to
@@ -103,6 +106,29 @@ left so they remain readable over any picture.
   search. The index is rebuilt only when the SD card's change counter differs
   from the one recorded (in RAM) at the last build, so a saved or deleted
   capture refreshes it and nothing else costs a rescan.
+- **Settings in search**: individual settings are found too, not only the
+  settings apps ("пин" → ПИН-код, "яркость", "форматировать"...), from
+  `r0n1n_setting_items[]` (label + extra keywords). Opening one starts its
+  settings app on that item: Desktop, Экран и звук, Система and Bluetooth
+  highlight it (the PIN, Quick launch and Always happy entries open straight
+  in), Хранилище and Питание jump into it, R0N1N's own settings select it.
+- **Smart matching** (`desktop_r0n1n_matches()`): case-insensitive, ё = е; a
+  Latin query is also tried in Cyrillic ("pitanie" → Питание) and a Russian
+  one in Latin ("ибуттон" → iButton); from 4 letters on, the start of a word
+  may differ by one typo, missing or extra letter, or two swapped letters.
+- **Recent searches**: the last 5 queries are kept in
+  `/ext/.r0n1n/searches.txt`; hold Back then shows them under "Новый поиск"
+  (straight to the keyboard while there are none). Saving them keeps a fresh
+  capture index fresh.
+
+## Control Center
+
+Down on Home: Bluetooth, Sound, Vibro, Silent mode, Backlight, Auto-lock,
+Lock, Power, Profile, Settings, and a brightness slider. Sound steps
+off → 25% → 50% → 75% → 100%, Backlight 5 s → 15 s → 30 s → 1 → 2 → 5 min,
+Auto-lock off → 30 s → 1 → 2 → 5 → 10 min, each with one OK; the header
+shows the value. Auto-lock is saved and re-armed the way Desktop settings
+does it.
 
 ## Academy
 

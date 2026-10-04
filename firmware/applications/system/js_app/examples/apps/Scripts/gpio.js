@@ -11,23 +11,23 @@ pot.init({ direction: "in", inMode: "analog" });
 button.init({ direction: "in", pull: "up", inMode: "interrupt", edge: "falling" });
 
 // blink led
-print("Commencing blinking (PC3)");
+print("Мигаем светодиодом (PC3)");
 eventLoop.subscribe(eventLoop.timer("periodic", 1000), function (_, _item, led, state) {
     led.write(state);
     return [led, !state];
 }, led, true);
 
 // cycle led pwm
-print("Commencing PWM (PA7)");
+print("Запускаем ШИМ (PA7)");
 eventLoop.subscribe(eventLoop.timer("periodic", 10), function (_, _item, led2, state) {
     led2.pwmWrite(10000, state);
     return [led2, (state + 1) % 101];
 }, led2, 0);
 
 // read potentiometer when button is pressed
-print("Press the button (PC1)");
+print("Нажмите кнопку (PC1)");
 eventLoop.subscribe(button.interrupt(), function (_, _item, pot) {
-    print("PC0 is at", pot.readAnalog(), "mV");
+    print("PC0:", pot.readAnalog(), "мВ");
 }, pot);
 
 // the program will just exit unless this is here

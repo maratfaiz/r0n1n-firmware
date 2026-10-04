@@ -211,7 +211,7 @@ static bool troika_parse(const NfcDevice* device, FuriString* parsed_data) {
         }
 
         if(is_ground_data_present && !furi_string_empty(ground_result)) {
-            render_section_header(parsed_data, "Ediny", 22, 22);
+            render_section_header(parsed_data, "Единый", 22, 22);
             furi_string_cat_printf(parsed_data, "%s\n", furi_string_get_cstr(ground_result));
         }
 

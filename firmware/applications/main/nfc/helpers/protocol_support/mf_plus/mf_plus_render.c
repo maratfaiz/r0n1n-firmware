@@ -31,9 +31,9 @@ void nfc_render_mf_plus_version(const MfPlusVersion* data, FuriString* str) {
         data->uid[6]);
     furi_string_cat_printf(
         str,
-        "hw %02x type %02x sub %02x\n"
-        " maj %02x min %02x\n"
-        " size %02x proto %02x\n",
+        "HW %02x тип %02x подтип %02x\n"
+        " версия %02x.%02x\n"
+        " размер %02x прот. %02x\n",
         data->hw_vendor,
         data->hw_type,
         data->hw_subtype,
@@ -43,9 +43,9 @@ void nfc_render_mf_plus_version(const MfPlusVersion* data, FuriString* str) {
         data->hw_proto);
     furi_string_cat_printf(
         str,
-        "sw %02x type %02x sub %02x\n"
-        " maj %02x min %02x\n"
-        " size %02x proto %02x\n",
+        "SW %02x тип %02x подтип %02x\n"
+        " версия %02x.%02x\n"
+        " размер %02x прот. %02x\n",
         data->sw_vendor,
         data->sw_type,
         data->sw_subtype,
@@ -55,8 +55,8 @@ void nfc_render_mf_plus_version(const MfPlusVersion* data, FuriString* str) {
         data->sw_proto);
     furi_string_cat_printf(
         str,
-        "batch %02x:%02x:%02x:%02x:%02x\n"
-        "week %d year %d\n",
+        "партия %02x:%02x:%02x:%02x:%02x\n"
+        "неделя %d год %d\n",
         data->batch[0],
         data->batch[1],
         data->batch[2],

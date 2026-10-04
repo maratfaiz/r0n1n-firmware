@@ -90,7 +90,7 @@ void desktop_settings_scene_quick_apps_direction_menu_on_enter(void* context) {
             desktop_settings_scene_quick_apps_direction_menu_submenu_callback,
             app);
 
-        submenu_set_header(app->submenu, "Режим Dummy");
+        submenu_set_header(app->submenu, "Игровой режим");
     }
 
     submenu_set_selected_item(app->submenu, app->quick_apps_direction_menu_idx);

@@ -130,8 +130,8 @@ static void mesurement_units_changed(VariableItem* item) {
 }
 
 const char* const time_format_text[] = {
-    "24h",
-    "12h",
+    "24ч",
+    "12ч",
 };
 
 const uint32_t time_format_value[] = {
@@ -343,8 +343,12 @@ void system_settings_free(SystemSettings* app) {
 }
 
 int32_t system_settings_app(void* p) {
-    UNUSED(p);
     SystemSettings* app = system_settings_alloc();
+    // R0N1N Search: "N" opens with item N highlighted (r0n1n_setting_items)
+    const char* arg = p;
+    if(arg && arg[0] >= '0' && arg[0] <= '9') {
+        variable_item_list_set_selected_item(app->var_item_list, atoi(arg));
+    }
     view_dispatcher_run(app->view_dispatcher);
     system_settings_free(app);
     return 0;

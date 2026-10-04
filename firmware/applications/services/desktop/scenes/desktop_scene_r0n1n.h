@@ -26,3 +26,7 @@ void desktop_r0n1n_prepare_carousel(Desktop* desktop);
 
 /** Show `text` in the info popup scene (text must be static). */
 void desktop_r0n1n_show_info(Desktop* desktop, const char* text);
+
+/** Open R0N1N Settings on `item` ("simple", "feedback", "wallpaper", "profile"
+ * or NULL for the top); "profile" goes on into the profile picker. */
+void desktop_scene_r0n1n_settings_open(Desktop* desktop, const char* item);

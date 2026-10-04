@@ -189,7 +189,7 @@ static bool banapass_parse(const NfcDevice* device, FuriString* parsed_data) {
         if(is_block_2_null) {
             furi_string_cat_str(
                 parsed_data,
-                "\nPlease scan the clone at the\nnearest CHUNITHM or\nmaimai Cabinet for the\nAccess Code.\n");
+                "\nОтсканируйте клон\nна ближайшем автомате\nCHUNITHM или maimai,\nчтобы узнать код доступа.\n");
             furi_string_cat_str(
                 parsed_data, "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
         } else {
@@ -206,7 +206,7 @@ static bool banapass_parse(const NfcDevice* device, FuriString* parsed_data) {
                 }
                 furi_string_cat_str(
                     parsed_data,
-                    "\nPlease check the back of\nyour Bandai Namco Passport\nfor the Access Code.\n");
+                    "\nКод доступа указан\nна обороте карты\nBandai Namco Passport.\n");
                 furi_string_cat_str(
                     parsed_data, "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
                 break;
@@ -215,7 +215,7 @@ static bool banapass_parse(const NfcDevice* device, FuriString* parsed_data) {
                 // banapass access code is stored as decimal hex representation in block 2, starts from byte 6, len 10 bytes
                 uint8_t access_code[10];
 
-                furi_string_cat_printf(parsed_data, "\nAccess Code:\n");
+                furi_string_cat_printf(parsed_data, "\nКод доступа:\n");
                 bool access_code_is_bcd = true;
 
                 for(int i = 0; i < 10; i++) {
@@ -228,7 +228,7 @@ static bool banapass_parse(const NfcDevice* device, FuriString* parsed_data) {
                     if((access_code[i] & 0x0F) > 9) access_code_is_bcd = false;
                 }
                 furi_string_cat_printf(
-                    parsed_data, "\nBCD valid: %s\n", access_code_is_bcd ? "Yes" : "No");
+                    parsed_data, "\nBCD верен: %s\n", access_code_is_bcd ? "да" : "нет");
                 if((access_code[0] >> 4) != 3) {
                     furi_string_cat_printf(
                         parsed_data,
@@ -247,7 +247,7 @@ static bool banapass_parse(const NfcDevice* device, FuriString* parsed_data) {
         for(int i = 0; i < 6; i++) {
             furi_string_cat_printf(parsed_data, "%c", magic_bytes[i]);
         }
-        furi_string_cat_str(parsed_data, "\nChecksum:\n");
+        furi_string_cat_str(parsed_data, "\nКонтр. сумма:\n");
         for(int i = 0; i < 8; i++) {
             furi_string_cat_printf(parsed_data, "%02X ", check_sum[i]);
         }

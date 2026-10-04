@@ -15,8 +15,8 @@ typedef enum {
 #define AUTO_LOCK_DELAY_COUNT 6
 static const char* const auto_lock_delay_text[AUTO_LOCK_DELAY_COUNT] = {
     "ВЫКЛ",
-    "30s",
-    "60s",
+    "30с",
+    "60с",
     "2мин",
     "5мин",
     "10мин",
